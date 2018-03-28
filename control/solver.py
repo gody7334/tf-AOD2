@@ -119,10 +119,11 @@ class Solver(object):
             summary_writer = tf.summary.FileWriter(self.log_path, graph=tf.get_default_graph())
             saver = tf.train.Saver(max_to_keep=10)
 
-            print(self.pretrained_model)
-            if self.mode == 'train':
-                print "Start training with pretrained Model.."
-                saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
+            if len(os.listdir(self.pretrained_model)):
+                print(self.pretrained_model)
+                if self.mode == 'train':
+                    print "Start training with pretrained Model.."
+                    saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
 
             prev_loss = -1
             curr_loss = 0

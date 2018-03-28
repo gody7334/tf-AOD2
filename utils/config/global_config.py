@@ -93,7 +93,7 @@ class Global_Config(object):
         self.train_checkpoint_log_dir = self.tf_model_dir
 
         #log directory.
-        self.log_dir = self.f_log_dir
+        self.log_dir = self.tf_log_dir
 
         # Image format ("jpeg" or "png").
         self.image_format = "jpeg"
@@ -219,25 +219,25 @@ class Global_Config(object):
         self.num_classes = 100 # 91 in mscoco
 
     def assign_global_config(self):
-        assert parse_args.train_dir, "--train_dir is required"
-        # Create training directory.
-        self.train_dir=parse_args.train_dir
-        if not tf.gfile.IsDirectory(self.train_dir):
-            tf.logging.info("Creating training directory: %s", train_dir)
-            tf.gfile.MakeDirs(train_dir)
+        # assert parse_args.train_dir, "--train_dir is required"
+        # # Create training directory.
+        # self.train_dir=parse_args.train_dir
+        # if not tf.gfile.IsDirectory(self.train_dir):
+            # tf.logging.info("Creating training directory: %s", train_dir)
+            # tf.gfile.MakeDirs(train_dir)
 
-        assert parse_args.log_dir, "--log_dir is required"
-        # Create log directory.
-        self.log_dir=parse_args.log_dir
-        if not tf.gfile.IsDirectory(self.log_dir):
-            tf.logging.info("Creating training directory: %s", log_dir)
-            tf.gfile.MakeDirs(log_dir)
+        # assert parse_args.log_dir, "--log_dir is required"
+        # # Create log directory.
+        # self.log_dir=parse_args.log_dir
+        # if not tf.gfile.IsDirectory(self.log_dir):
+            # tf.logging.info("Creating training directory: %s", log_dir)
+            # tf.gfile.MakeDirs(log_dir)
 
-        # Evaluate training directory.
-        self.eval_dir=parse_args.eval_dir
-        if not tf.gfile.IsDirectory(self.eval_dir):
-            tf.logging.info("Creating training directory: %s", eval_dir)
-            tf.gfile.MakeDirs(eval_dir)
+        # # Evaluate training directory.
+        # self.eval_dir=parse_args.eval_dir
+        # if not tf.gfile.IsDirectory(self.eval_dir):
+            # tf.logging.info("Creating training directory: %s", eval_dir)
+            # tf.gfile.MakeDirs(eval_dir)
 
         assert parse_args.input_file_pattern, "--input_file_pattern is required"
         self.input_file_pattern=parse_args.input_file_pattern
