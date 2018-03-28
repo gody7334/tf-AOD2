@@ -6,10 +6,24 @@ import tensorflow as tf
 import os
 import os.path as osp
 import numpy as np
-
-parse_args = tf.app.flags.FLAGS
+import argparse
+import ipdb
+from datetime import datetime
 
 project_folder = "/home/gody7334/Project/tensorflow/ipython/AOD2"
+
+########### python arg parser
+parser = argparse.ArgumentParser(description='Description of your program')
+parser.add_argument('-m','--mode', help='mode should be one of "train" "new_train" "eval" "inference"', required=True)
+parser.add_argument('-b','--checkpoint_base_dir', help='checkpoint base dir', required=False)
+parser.add_argument('-e','--checkpoint_sub_dir', help='experiement name, format: YYYYMMDD-HHmmSS-TAG', required=False)
+parser.add_argument('-d','--device', help='cpu, if provided', required=False)
+parser.add_argument('-l','--log', help='t, if provided', required=False)
+parser.add_argument('-g','--git', help='t, if provided', required=False)
+args = vars(parser.parse_args())
+
+########### tf arg parser
+parse_args = tf.app.flags.FLAGS
 
 # tf.flags.DEFINE_string("input_file_pattern", project_folder+"/data/dataset/train-?????-of-00256", "File pattern of sharded TFRecord input files.")
 tf.flags.DEFINE_string("input_file_pattern", project_folder+"/data/dataset/train-000??-of-00256", "File pattern of sharded TFRecord input files.")
@@ -37,15 +51,49 @@ def assign_config():
 class Global_Config(object):
 
     def __init__(self):
+        now = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+        def mkdir(d):
+            if not os.path.exists(d):
+                os.makedirs(d)
+
+        # new checkpoint structure
+        self.checkpoint_base_dir = project_folder+"/data/check_point/";
+        if args['checkpoint_base_dir'] is not None:
+            self.checkpoint_base_dir = args['checkpoint_base_dir']
+        self.checkpoint_sub_dir = now + '/'
+        if args['checkpoint_sub_dir'] is not None:
+            self.checkpoint_sub_dir = args['checkpoint_sub_dir'] + '/'
+        self.tf_model_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "model/"
+        self.tf_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tf_log/"
+        self.tb_train_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_train/"
+        self.tb_eval_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_eval/"
+        self.tb_test_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_test/"
+
+        mkdir(self.checkpoint_base_dir+self.checkpoint_sub_dir)
+        mkdir(self.tf_model_dir)
+        mkdir(self.tf_log_dir)
+        mkdir(self.tb_train_log_dir)
+        mkdir(self.tb_eval_log_dir)
+        mkdir(self.tb_test_log_dir)
+
+        self.mode = args['mode']
+        self.device = args['device']
+        self.is_tf_log = False
+        if args['log'] == "t":
+            self.is_tf_log=True
+
         # File pattern of sharded TFRecord file containing SequenceExample protos.
         # Must be pmrovided in training and evaluation modes.
         self.input_file_pattern = None
 
         #training directory.
-        self.train_dir = None
+        self.train_dir = self.tb_train_log_dir
+        self.train_checkpoint_log_dir = self.tf_model_dir
 
         #log directory.
-        self.log_dir = None
+        self.log_dir = self.f_log_dir
 
         # Image format ("jpeg" or "png").
         self.image_format = "jpeg"

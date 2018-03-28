@@ -188,8 +188,12 @@ class AOD(IForward):
         with tf.variable_scope('attension_region_proposal_layer',reuse=reuse):
             baseline_w = tf.get_variable('baseline_w', [self.H, 1],initializer=self.weight_initializer)
             baseline_b = tf.get_variable('baseline_b', [1], initializer=self.point5_initializer)
-            mean_w = tf.get_variable('mean_w', [self.H, self.B],initializer=self.weight_initializer)
-            mean_b = tf.get_variable('mean_b', [self.B],initializer=self.point5_initializer)
+            # mean_w = tf.get_variable('mean_w', [self.H, self.B],initializer=self.weight_initializer)
+            # mean_b = tf.get_variable('mean_b', [self.B],initializer=self.point5_initializer)
+            mean_w = tf.get_variable('mean_w', [self.H, 2],initializer=self.weight_initializer)
+            mean_b = tf.get_variable('mean_b', [2],initializer=self.point5_initializer)
+
+
 
             # train a baseline_beline function
             # baseline might out of boundry.
@@ -218,27 +222,14 @@ class AOD(IForward):
             # sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
             # sample_loc_origin = mean_loc + tf.random_uniform(mean_loc.get_shape(), -0.5, 0.5)*ee
 
-            ## mean_loc might out of boundry,
-            ## also need to limit mean after sampleing,
-            ## or policy will measure the wrong loss (gradient)
-            # mean_loc= tf.maximum(1e-10, tf.minimum(1.0,mean_loc))
-            # mean_loc = self._convert_coordinate(mean_loc, "frcnn","bmp",dim=2)
-            # mean_loc = tf.maximum(1e-10, tf.minimum(1.0,mean_loc))
-            # mean_loc = self._convert_coordinate(mean_loc, "bmp", "frcnn",dim=2)
-            ## mean_loc = tf.stop_gradient(mean_loc)
+
+            mean_loc = tf.concat([mean_loc, tf.fill(mean_loc.get_shape(), 0.1)], 1)
+            sample_loc_origin = tf.concat([sample_loc_origin , tf.fill(sample_loc_origin.get_shape(), 0.1)], 1)
+
             self.mean_locs_list.append(mean_loc)
             self.sample_locs_origin_list.append(sample_loc_origin)
 
-            # Need to clip sample_loc to get the right features
-            # first clip for invalid (xmid, ymid, w, h)
-            # sample_loc = tf.maximum(1e-10, tf.minimum(1.0, sample_loc_origin))
             sample_loc = sample_loc_origin
-            # # second clip for invalid (xmin, ymin, xmax, ymax)
-            # sample_loc = self._convert_coordinate(sample_loc, "frcnn","bmp",dim=2)
-            # sample_loc = tf.maximum(1e-10, tf.minimum(1.0, sample_loc))
-            # sample_loc = self._convert_coordinate(sample_loc, "bmp", "frcnn",dim=2)
-            # # after clipping xmid, ymid will shift too.
-
             # sample_loc = tf.stop_gradient(sample_loc)
             self.sampled_locs_list.append(sample_loc)
 
@@ -514,12 +505,12 @@ class AOD(IForward):
 
         invalid_mean_loc = self._invalid_bbox(mean_location_input)
         invalid_sample_loc = self._invalid_bbox(sample_location_origin)
-        # invalid_sample_loc = tf.fill(invalid_sample_loc.get_shape(),0.0)
+        invalid_sample_loc = tf.fill(invalid_sample_loc.get_shape(),0.0)
         invalid_mean_loc =_debug_func(invalid_mean_loc ,'policy_invalid_mean_loc',break_point=False, to_file=True)
         invalid_sample_loc =_debug_func(invalid_sample_loc ,'policy_invalid_sample_loc',break_point=False, to_file=True)
 
         # rewards
-        rewards_scale = 1e2
+        rewards_scale = 1e1
         invalid_scale = 1e0
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
         # rewards = (tf.squeeze(iou,[1,2]) * predict_target_prob)*rewards_scale
@@ -538,17 +529,12 @@ class AOD(IForward):
         # construct schocastic policy using mean and sample location
         # p_loc = gaussian_pdf(mean_location_input, sample_location_input)
         p_loc = gaussian_pdf(mean_location_input, sample_location_origin)
-        p_loc = (-0.5)*((mean_location_input - sample_location_origin)**2)
-        # p_loc =_debug_func(p_loc ,'policy_p_loc',break_point=False, to_file=True)
-
-        # p_loc = tf.tanh(p_loc)
-        # p_loc =_debug_func(p_loc ,'policy_tanh_p_loc',break_point=False, to_file=True)
+        # p_loc = (-0.5)*((mean_location_input - sample_location_origin)**2)
+        p_loc =_debug_func(p_loc ,'policy_p_loc',break_point=False, to_file=True)
 
         # likelihood estimator
-        # rewards = tf.tile(tf.expand_dims(rewards,[1]), [1,4])
-        # baseline_iou = tf.tile(tf.expand_dims(baseline_iou,[1]), [1,4])
-        # J = tf.reduce_sum(tf.reduce_sum(tf.log(p_loc + 1e-10),[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
-        J = tf.reduce_sum(tf.reduce_sum(p_loc + 1e-10,[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
+        J = tf.reduce_sum(tf.reduce_sum(tf.log(p_loc + 1e-10),[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
+        # J = tf.reduce_sum(tf.reduce_sum(p_loc + 1e-10,[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
         J = J - tf.reduce_sum(tf.square(cum_rewards - baseline_iou), 1)
         J =_debug_func(J ,'policy_J',break_point=False, to_file=True)
         return -J

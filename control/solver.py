@@ -7,7 +7,6 @@ import os
 import cPickle as pickle
 from scipy import ndimage
 from utils import *
-from datetime import datetime
 import ipdb
 from pprint import pprint as pp
 
@@ -48,11 +47,11 @@ class Solver(object):
         self.print_bleu = kwargs.pop('print_bleu', False)
         self.print_every = kwargs.pop('print_every', 50)
         self.save_every = kwargs.pop('save_every', 50)
-        self.log_path = kwargs.pop('log_path', './data/check_point/')
-        self.model_path = kwargs.pop('model_path', './data/check_point/')
-        self.pretrained_model = kwargs.pop('pretrained_model', './data/check_point/')
-        self.test_model = kwargs.pop('test_model', './model/lstm/model-1')
-        self.mode = kwargs.pop('mode','train')
+        self.log_path = kwargs.pop('log_path', global_config.global_config.tb_train_log_dir)
+        self.model_path = kwargs.pop('model_path', global_config.global_config.tf_model_dir)
+        self.pretrained_model = kwargs.pop('pretrained_model', global_config.global_config.tf_model_dir)
+        self.test_model = kwargs.pop('test_model', global_config.global_config.tf_model_dir)
+        self.mode = kwargs.pop('mode',global_config.global_config.mode)
 
         # set an optimizer by update rule
         # if self.update_rule == 'adam':
@@ -106,20 +105,18 @@ class Solver(object):
             # tf.summary.histogram(var.op.name + '/gradient', grad)
 
         summary_op = tf.summary.merge_all()
-        now = datetime.now().strftime("%Y%m%d-%H%M%S")
 
         print "The number of epoch: %d" % self.n_epochs
         print "Data size: %d" % n_examples
         print "Batch size: %d" % self.batch_size
         print "Iterations per epoch: %d" % n_iters_per_epoch
-        print "Now: %s" % now
 
         config = tf.ConfigProto(allow_soft_placement=True)
         # config.gpu_options.per_process_gpu_memory_fraction=0.9
         config.gpu_options.allow_growth = True
         with tf.Session(config=config) as sess:
             tf.global_variables_initializer().run()
-            summary_writer = tf.summary.FileWriter(self.log_path + '/' + now + '/', graph=tf.get_default_graph())
+            summary_writer = tf.summary.FileWriter(self.log_path, graph=tf.get_default_graph())
             saver = tf.train.Saver(max_to_keep=10)
 
             print(self.pretrained_model)

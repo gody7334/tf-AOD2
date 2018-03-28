@@ -14,11 +14,12 @@ import pprint
 from time import sleep
 import random
 import pdb
+from utils.config import global_config
 
 counter = 0
 
 def _debug_func(tensor, name="", print_tf=False, print_op=False, break_point=False, to_file=False):
-  do_debug = False
+  do_debug = global_config.global_config.is_tf_log
 
   if do_debug:
     t = tensor
@@ -36,7 +37,7 @@ def debug_func(tf, tf_name, tf_op, tf_type, tf_device, print_tf, print_op, break
   counter += 1
   if to_file and counter%50==0:
     np.set_printoptions(threshold=np.nan)
-    f = open('./data/log/'+name+'_log.txt','a')
+    f = open(global_config.global_config.tf_log_dir + name + '_log.txt','a')
     pprint.pprint(name, f)
     pprint.pprint(tf_name, f)
     pprint.pprint(np.round(tf,2), f)
