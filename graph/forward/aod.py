@@ -74,7 +74,7 @@ class AOD(IForward):
         self.targets = None
         self.weights = None
 
-        self.loc_sd = 0.1
+        self.loc_sd = 0.2
         self.ee_ratio = 0.9
         self.region_proposals_list = []
         self.roises_list = [] # RoI location, used to reconstuct the bbox coordinate in a image
@@ -223,7 +223,7 @@ class AOD(IForward):
             # sample_loc_origin = mean_loc + tf.random_uniform(mean_loc.get_shape(), -0.5, 0.5)*ee
 
 
-            mean_loc = tf.concat([mean_loc, tf.fill(mean_loc.get_shape(), 0.1)], 1)
+            mean_loc = tf.concat([mean_loc, tf.fill(mean_loc.get_shape(), 0.3)], 1)
             sample_loc_origin = tf.concat([sample_loc_origin , tf.fill(sample_loc_origin.get_shape(), 0.1)], 1)
 
             self.mean_locs_list.append(mean_loc)
