@@ -74,7 +74,7 @@ class AOD(IForward):
         self.targets = None
         self.weights = None
 
-        self.loc_sd = 0.2
+        self.loc_sd = 0.15
         self.ee_ratio = 0.9
         self.region_proposals_list = []
         self.roises_list = [] # RoI location, used to reconstuct the bbox coordinate in a image
