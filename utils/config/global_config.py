@@ -53,7 +53,6 @@ class Global_Config(object):
     def __init__(self):
         now = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-
         def mkdir(d):
             if not os.path.exists(d):
                 os.makedirs(d)
@@ -83,6 +82,9 @@ class Global_Config(object):
         self.is_tf_log = False
         if args['log'] == "t":
             self.is_tf_log=True
+
+        self.log_every_n_steps = 400
+        self.tf_save_image_every_n_steps = 400
 
         # File pattern of sharded TFRecord file containing SequenceExample protos.
         # Must be pmrovided in training and evaluation modes.
