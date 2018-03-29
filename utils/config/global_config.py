@@ -83,8 +83,7 @@ class Global_Config(object):
         if args['log'] == "t":
             self.is_tf_log=True
 
-        self.log_every_n_steps = 1000
-        self.tf_save_image_every_n_steps = 100000
+        self.log_every_n_steps = 4000
 
         # File pattern of sharded TFRecord file containing SequenceExample protos.
         # Must be pmrovided in training and evaluation modes.

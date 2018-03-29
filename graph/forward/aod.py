@@ -682,22 +682,20 @@ class AOD(IForward):
         self.logits = logits
         logits =_debug_func(logits ,'getloss_logits',break_point=False, to_file=True)
 
-        draw_bbox_count = 0
-        if draw_bbox_count % global_config.global_config.tf_save_image_every_n_steps == 0:
-            logits = self._convert_coordinate(logits, "frcnn","mscoco",dim=3)
-            image_processing.draw_tf_bounding_boxes(self.images, logits, name="logits")
-            image_processing.draw_tf_bounding_boxes(self.images, self.bbox_seqs, name="targets")
+        logits = self._convert_coordinate(logits, "frcnn","mscoco",dim=3)
+        image_processing.draw_tf_bounding_boxes(self.images, logits, name="logits")
+        image_processing.draw_tf_bounding_boxes(self.images, self.bbox_seqs, name="targets")
 
-            target_mask = tf.cast(tf.greater(target_bboxes,0),tf.float32)
-            predict_bbox_full_on_target = target_mask*predict_bbox_full
-            region_proposal = tf.transpose(tf.stack(self.region_proposals_list),(1,0,2))
-            region_proposal_on_target = target_mask*region_proposal
-            region_proposal = self._convert_coordinate(region_proposal, "frcnn","mscoco",dim=3)
-            predict_bbox_full_on_target = self._convert_coordinate(predict_bbox_full_on_target, "frcnn","mscoco",dim=3)
-            region_proposal_on_target = self._convert_coordinate(region_proposal_on_target , "frcnn","mscoco",dim=3)
-            image_processing.draw_tf_bounding_boxes(self.images, region_proposal, name="region_proposal")
-            image_processing.draw_tf_bounding_boxes(self.images,predict_bbox_full_on_target, name="predict_bbox_full_on_target")
-            image_processing.draw_tf_bounding_boxes(self.images,region_proposal_on_target, name="region_proposal_on_target")
+        target_mask = tf.cast(tf.greater(target_bboxes,0),tf.float32)
+        predict_bbox_full_on_target = target_mask*predict_bbox_full
+        region_proposal = tf.transpose(tf.stack(self.region_proposals_list),(1,0,2))
+        region_proposal_on_target = target_mask*region_proposal
+        region_proposal = self._convert_coordinate(region_proposal, "frcnn","mscoco",dim=3)
+        predict_bbox_full_on_target = self._convert_coordinate(predict_bbox_full_on_target, "frcnn","mscoco",dim=3)
+        region_proposal_on_target = self._convert_coordinate(region_proposal_on_target , "frcnn","mscoco",dim=3)
+        image_processing.draw_tf_bounding_boxes(self.images, region_proposal, name="region_proposal")
+        image_processing.draw_tf_bounding_boxes(self.images,predict_bbox_full_on_target, name="predict_bbox_full_on_target")
+        image_processing.draw_tf_bounding_boxes(self.images,region_proposal_on_target, name="region_proposal_on_target")
 
         tf.losses.add_loss(batch_loss)
         total_loss = tf.losses.get_total_loss()
