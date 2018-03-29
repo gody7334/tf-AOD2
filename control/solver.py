@@ -131,6 +131,7 @@ class Solver(object):
 
             # for e in range(self.n_epochs):
             e = 0
+            step = 0
             while(True):
                 rand_idxs = np.random.permutation(n_examples)
                 bboxes = bboxes[rand_idxs]
@@ -151,7 +152,8 @@ class Solver(object):
                     curr_loss += l
 
                     # write summary for tensorboard visualization
-                    if e % global_config.global_config.log_every_n_steps == 0:
+                    step += 1
+                    if step % global_config.global_config.log_every_n_steps == 0:
                         summary = sess.run(summary_op, feed_dict)
                         summary_writer.add_summary(
                             summary, tf.train.global_step(sess, self.model.global_step))
