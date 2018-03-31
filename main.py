@@ -33,8 +33,10 @@ def prepare():
 
     if global_config.global_config.device == "cpu":
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
-    else:
+    elif global_config.global_config.device == "gpu0":
         os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    elif global_config.global_config.device == "gpu1":
+        os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def clean_folder(folder_dir):
     for the_file in os.listdir(folder_dir):
