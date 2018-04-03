@@ -16,7 +16,7 @@ from graph.ops.debug import _debug_func
 class IForward(object):
 
     def __init__(self, mode, data):
-        assert mode in ["train", "eval", "inference"], "mode should be 'train', 'eval', or 'inference"
+        assert mode in ["train", "val", "inference"], "mode should be 'train', 'val', or 'inference"
         self.config = global_config.global_config
         self.mode = mode
         self.data = data

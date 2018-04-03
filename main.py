@@ -19,11 +19,16 @@ def main():
     # load val dataset to print out bleu scores every epoch
     val_data = load_coco_data(data_path='./data/data', split='val', if_train=False)
 
-    model =AOD(mode='train',data=None)
-    optimizer = Backward(model = model)
 
-    solver = Solver(model, optimizer, data, val_data)
-    solver.train(chunk=0)
+    if global_config.global_config.mode == 'train':
+        model =AOD(mode='train',data=None)
+        optimizer = Backward(model = model)
+        solver = Solver(model, optimizer, data, val_data)
+        solver.train(chunk=0)
+    elif global_config.global_config.mode == 'val':
+        model =AOD(mode='val',data=None)
+        solver = Solver(model, None, data, val_data)
+        solver.val()
 
 def prepare():
     global_config.assign_config()
@@ -50,7 +55,6 @@ def rm_file(file_path):
         #elif os.path.isdir(file_path): shutil.rmtree(file_path)
     except Exception as e:
         print(e)
-
 
 if __name__ == "__main__":
     main()

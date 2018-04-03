@@ -14,7 +14,7 @@ project_folder = "/home/gody7334/Project/tensorflow/ipython/AOD2"
 
 ########### python arg parser
 parser = argparse.ArgumentParser(description='Description of your program')
-parser.add_argument('-m','--mode', help='mode should be one of "train" "new_train" "eval" "inference"', required=True)
+parser.add_argument('-m','--mode', help='mode should be one of "train" "val" "inference"', required=True)
 parser.add_argument('-b','--checkpoint_base_dir', help='checkpoint base dir', required=False)
 parser.add_argument('-e','--checkpoint_sub_dir', help='experiement name, format: YYYYMMDD-HHmmSS-TAG', required=False)
 parser.add_argument('-d','--device', help='cpu, if provided', required=False)
