@@ -77,10 +77,10 @@ class Solver(object):
         bboxes = self.data['bboxes']
         classes = self.data['classes']
         image_idxs = self.data['image_idxs']
-        val_features = self.val_data['features']
-        val_iamges = self.val_data['images']
-        n_iters_val = int(
-            np.ceil(float(val_features.shape[0]) / self.batch_size))
+        # val_features = self.val_data['features']
+        # val_iamges = self.val_data['images']
+        # n_iters_val = int(
+            # np.ceil(float(val_features.shape[0]) / self.batch_size))
 
         # build graphs for training model and sampling captions
         # loss = self.model.build_model()
@@ -204,6 +204,8 @@ class Solver(object):
                     saver.save(sess, os.path.join(
                         self.model_path, 'model'), global_step=e + 1 + chunk * 10)
                     print "model-%s saved." % (e + 1 + chunk * 10)
+                    sess.close()
+                    self.val()
 
     def val(self, chunk=0):
         # train/val dataset
@@ -252,88 +254,87 @@ class Solver(object):
 
         config = tf.ConfigProto(allow_soft_placement=True)
         # config.gpu_options.per_process_gpu_memory_fraction=0.9
-        config.gpu_options.allow_growth = True
+        # config.gpu_options.allow_growth = True
 
-        while(True):
-            with tf.Session(config=config) as sess:
-                tf.global_variables_initializer().run()
-                summary_writer = tf.summary.FileWriter(self.val_log_path, graph=tf.get_default_graph())
-                saver = tf.train.Saver(max_to_keep=10)
+        # ipdb.set_trace()
+        with tf.Session(config=config) as sess:
+            tf.global_variables_initializer().run()
+            summary_writer = tf.summary.FileWriter(self.val_log_path, graph=tf.get_default_graph())
+            saver = tf.train.Saver(max_to_keep=10)
 
-                if len(os.listdir(self.pretrained_model)):
-                    print(self.pretrained_model)
-                    if self.mode == 'val':
-                        print "Start validation with pretrained Model.."
-                        saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
+            if len(os.listdir(self.pretrained_model)):
+                print(self.pretrained_model)
+                if self.mode == 'val':
+                    print "Start validation with pretrained Model.."
+                    saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
 
-                prev_loss = -1
+            prev_loss = -1
+            curr_loss = 0
+            start_t = time.time()
+
+            # run all val_data only once on this model
+            rand_idxs = np.random.permutation(n_examples)
+            bboxes = bboxes[rand_idxs]
+            classes = classes[rand_idxs]
+            image_idxs = image_idxs[rand_idxs]
+
+            for i in range(n_iters_per_epoch):
+                classes_batch = classes[i * self.batch_size:(i + 1) * self.batch_size]
+                bboxes_batch = bboxes[i * self.batch_size:(i + 1) * self.batch_size]
+                image_idxs_batch = image_idxs[i * self.batch_size:(i + 1) * self.batch_size]
+                features_batch = features[image_idxs_batch]
+                images_batch = images[image_idxs_batch]
+                feed_dict = {self.model.images: images_batch,
+                             self.model.features: features_batch,
+                             self.model.bbox_seqs: bboxes_batch,
+                             self.model.class_seqs: classes_batch}
+                l = sess.run(self.model.batch_loss, feed_dict)
+                curr_loss += l
+
+                # if (i + 1) % self.print_every == 0:
+                    # print "\nTrain loss at epoch %d & iteration %d (mini-batch): %.5f" % (e + 1 + chunk * 10, i + 1, l)
+                    # ground_truths = bboxes[image_idxs == image_idxs_batch[0]]
+                    # decoded = decode_captions(
+                        # ground_truths, self.model.idx_to_word)
+                    # for j, gt in enumerate(decoded):
+                        # print "Ground truth %d: %s" % (j + 1, gt)
+                    # gen_caps = sess.run(generated_captions, feed_dict)
+                    # decoded = decode_captions(
+                        # gen_caps, self.model.idx_to_word)
+                    # print "Generated caption: %s\n" % decoded[0]
+
+                print "Previous epoch loss: ", prev_loss
+                print "Current epoch loss: ", curr_loss
+                print "Elapsed time: ", time.time() - start_t
+                prev_loss = curr_loss
                 curr_loss = 0
-                start_t = time.time()
 
-                # run all val_data only once on this model
-                rand_idxs = np.random.permutation(n_examples)
-                bboxes = bboxes[rand_idxs]
-                classes = classes[rand_idxs]
-                image_idxs = image_idxs[rand_idxs]
+                # print out BLEU scores and file write
+                # if self.print_bleu:
+                    # all_gen_cap = np.ndarray((val_features.shape[0], 20))
+                    # for i in range(n_iters_val):
+                        # features_batch = val_features[i *
+                                                      # self.batch_size:(i + 1) * self.batch_size]
+                        # feed_dict = {self.model.features: features_batch}
+                        # gen_cap = sess.run(
+                            # generated_captions, feed_dict=feed_dict)
+                        # all_gen_cap[i *
+                                    # self.batch_size:(i + 1) * self.batch_size] = gen_cap
 
-                for i in range(n_iters_per_epoch):
-                    classes_batch = classes[i * self.batch_size:(i + 1) * self.batch_size]
-                    bboxes_batch = bboxes[i * self.batch_size:(i + 1) * self.batch_size]
-                    image_idxs_batch = image_idxs[i * self.batch_size:(i + 1) * self.batch_size]
-                    features_batch = features[image_idxs_batch]
-                    images_batch = images[image_idxs_batch]
-                    feed_dict = {self.model.images: images_batch,
-                                 self.model.features: features_batch,
-                                 self.model.bbox_seqs: bboxes_batch,
-                                 self.model.class_seqs: classes_batch}
-                    l = sess.run(self.model.batch_loss, feed_dict)
-                    curr_loss += l
+                    # all_decoded = decode_captions(
+                        # all_gen_cap, self.model.idx_to_word)
+                    # save_pickle(
+                        # all_decoded, "./data/val/val.candidate.captions.pkl")
+                    # scores = evaluate(data_path='./data',
+                                      # split='val', get_scores=True)
+                    # write_bleu(scores=scores, path=self.model_path, epoch=e + chunk * 10)
+                            # write summary for tensorboard visualization
 
-                    # if (i + 1) % self.print_every == 0:
-                        # print "\nTrain loss at epoch %d & iteration %d (mini-batch): %.5f" % (e + 1 + chunk * 10, i + 1, l)
-                        # ground_truths = bboxes[image_idxs == image_idxs_batch[0]]
-                        # decoded = decode_captions(
-                            # ground_truths, self.model.idx_to_word)
-                        # for j, gt in enumerate(decoded):
-                            # print "Ground truth %d: %s" % (j + 1, gt)
-                        # gen_caps = sess.run(generated_captions, feed_dict)
-                        # decoded = decode_captions(
-                            # gen_caps, self.model.idx_to_word)
-                        # print "Generated caption: %s\n" % decoded[0]
-
-                    print "Previous epoch loss: ", prev_loss
-                    print "Current epoch loss: ", curr_loss
-                    print "Elapsed time: ", time.time() - start_t
-                    prev_loss = curr_loss
-                    curr_loss = 0
-
-                    # print out BLEU scores and file write
-                    # if self.print_bleu:
-                        # all_gen_cap = np.ndarray((val_features.shape[0], 20))
-                        # for i in range(n_iters_val):
-                            # features_batch = val_features[i *
-                                                          # self.batch_size:(i + 1) * self.batch_size]
-                            # feed_dict = {self.model.features: features_batch}
-                            # gen_cap = sess.run(
-                                # generated_captions, feed_dict=feed_dict)
-                            # all_gen_cap[i *
-                                        # self.batch_size:(i + 1) * self.batch_size] = gen_cap
-
-                        # all_decoded = decode_captions(
-                            # all_gen_cap, self.model.idx_to_word)
-                        # save_pickle(
-                            # all_decoded, "./data/val/val.candidate.captions.pkl")
-                        # scores = evaluate(data_path='./data',
-                                          # split='val', get_scores=True)
-                        # write_bleu(scores=scores, path=self.model_path, epoch=e + chunk * 10)
-                                # write summary for tensorboard visualization
-
-                summary = sess.run(summary_op, feed_dict)
-                summary_writer.add_summary(
-                    summary, tf.train.global_step(sess, self.model.global_step))
-                ipdb.set_trace()
-                sleep(1)
-                sess.close
+            summary = sess.run(summary_op, feed_dict)
+            summary_writer.add_summary(
+                summary, tf.train.global_step(sess, self.model.global_step))
+            sess.close()
+            self.train()
 
     def test(self, data, split='test', attention_visualization=True, save_sampled_captions=True):
         '''

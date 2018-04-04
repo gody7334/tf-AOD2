@@ -14,18 +14,16 @@ import colored_traceback.always
 def main():
     prepare()
 
-    # load train dataset
-    data = load_coco_data(data_path='./data/data', split='train', if_train=True)
-    # load val dataset to print out bleu scores every epoch
-    val_data = load_coco_data(data_path='./data/data', split='val', if_train=False)
-
-
     if global_config.global_config.mode == 'train':
+        data = load_coco_data(data_path='./data/data', split='train', if_train=True)
+        val_data = load_coco_data(data_path='./data/data', split='val', if_train=False)
         model =AOD(mode='train',data=None)
         optimizer = Backward(model = model)
         solver = Solver(model, optimizer, data, val_data)
         solver.train(chunk=0)
     elif global_config.global_config.mode == 'val':
+        data = None
+        val_data = load_coco_data(data_path='./data/data', split='val', if_train=False)
         model =AOD(mode='val',data=None)
         solver = Solver(model, None, data, val_data)
         solver.val()
