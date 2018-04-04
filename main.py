@@ -20,7 +20,10 @@ def main():
         model =AOD(mode='train',data=None)
         optimizer = Backward(model = model)
         solver = Solver(model, optimizer, data, val_data)
-        solver.train(chunk=0)
+        while(True):
+            solver.train()
+            solver.val()
+
     elif global_config.global_config.mode == 'val':
         data = None
         val_data = load_coco_data(data_path='./data/data', split='val', if_train=False)

@@ -83,6 +83,7 @@ class Global_Config(object):
         if args['log'] == "t":
             self.is_tf_log=True
 
+        self.train_n_epoch = 50
         self.log_every_n_steps = 400
 
         # File pattern of sharded TFRecord file containing SequenceExample protos.

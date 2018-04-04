@@ -41,13 +41,13 @@ class Solver(object):
         self.data = data
         self.optimizer = optimizer
         self.val_data = val_data
-        self.n_epochs = kwargs.pop('n_epochs', 1000)
+        self.n_epochs = kwargs.pop('n_epochs', global_config.global_config.train_n_epoch)
         self.batch_size = kwargs.pop('batch_size', global_config.global_config.batch_size)
         self.update_rule = kwargs.pop('update_rule', 'adam')
         self.learning_rate = kwargs.pop('learning_rate', 0.01)
         self.print_bleu = kwargs.pop('print_bleu', False)
         self.print_every = kwargs.pop('print_every', 50)
-        self.save_every = kwargs.pop('save_every', 50)
+        self.save_every = kwargs.pop('save_every', global_config.global_config.train_n_epoch)
         self.log_path = kwargs.pop('log_path', global_config.global_config.tb_train_log_dir)
         self.val_log_path = kwargs.pop('val_log_path', global_config.global_config.tb_eval_log_dir)
         self.model_path = kwargs.pop('model_path', global_config.global_config.tf_model_dir)
@@ -131,10 +131,9 @@ class Solver(object):
             curr_loss = 0
             start_t = time.time()
 
-            # for e in range(self.n_epochs):
             e = 0
             step = 0
-            while(True):
+            for e in range(self.n_epochs):
                 rand_idxs = np.random.permutation(n_examples)
                 bboxes = bboxes[rand_idxs]
                 classes = classes[rand_idxs]
@@ -201,11 +200,11 @@ class Solver(object):
                 # save model's parameters
                 e+=1
                 if (e + 1) % self.save_every == 0:
-                    saver.save(sess, os.path.join(
-                        self.model_path, 'model'), global_step=e + 1 + chunk * 10)
-                    print "model-%s saved." % (e + 1 + chunk * 10)
-                    sess.close()
-                    self.val()
+                    saver.save(sess,
+                            os.path.join(self.model_path, 'model'),
+                            tf.train.global_step(sess, self.model.global_step))
+                    print "model-%s saved." % tf.train.global_step(sess, self.model.global_step)
+        sess.close()
 
     def val(self, chunk=0):
         # train/val dataset
@@ -291,6 +290,10 @@ class Solver(object):
                 l = sess.run(self.model.batch_loss, feed_dict)
                 curr_loss += l
 
+                summary = sess.run(summary_op, feed_dict)
+                summary_writer.add_summary(
+                    summary, tf.train.global_step(sess, self.model.global_step))
+
                 # if (i + 1) % self.print_every == 0:
                     # print "\nTrain loss at epoch %d & iteration %d (mini-batch): %.5f" % (e + 1 + chunk * 10, i + 1, l)
                     # ground_truths = bboxes[image_idxs == image_idxs_batch[0]]
@@ -329,12 +332,7 @@ class Solver(object):
                                       # split='val', get_scores=True)
                     # write_bleu(scores=scores, path=self.model_path, epoch=e + chunk * 10)
                             # write summary for tensorboard visualization
-
-            summary = sess.run(summary_op, feed_dict)
-            summary_writer.add_summary(
-                summary, tf.train.global_step(sess, self.model.global_step))
-            sess.close()
-            self.train()
+        sess.close()
 
     def test(self, data, split='test', attention_visualization=True, save_sampled_captions=True):
         '''
