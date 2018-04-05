@@ -49,7 +49,7 @@ class Solver(object):
         self.print_every = kwargs.pop('print_every', 50)
         self.save_every = kwargs.pop('save_every', global_config.global_config.train_n_epoch)
         self.log_path = kwargs.pop('log_path', global_config.global_config.tb_train_log_dir)
-        self.val_log_path = kwargs.pop('val_log_path', global_config.global_config.tb_eval_log_dir)
+        # self.val_log_path = kwargs.pop('val_log_path', global_config.global_config.tb_eval_log_dir)
         self.model_path = kwargs.pop('model_path', global_config.global_config.tf_model_dir)
         self.pretrained_model = kwargs.pop('pretrained_model', global_config.global_config.tf_model_dir)
         self.test_model = kwargs.pop('test_model', global_config.global_config.tf_model_dir)
@@ -124,9 +124,8 @@ class Solver(object):
 
             if len(os.listdir(self.pretrained_model)):
                 print(self.pretrained_model)
-                if self.mode == 'train':
-                    print "Start training with pretrained Model.."
-                    saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
+                print "Start training with pretrained Model.."
+                saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
 
             prev_loss = -1
             curr_loss = 0
@@ -207,134 +206,82 @@ class Solver(object):
                     print "model-%s saved." % tf.train.global_step(sess, self.model.global_step)
         sess.close()
 
+    # evaluate the policy gradient model by setting sampling standard deviation ~= 0
     def val(self, chunk=0):
         global_config.global_config.tf_mode = 'val'
-        # train/val dataset
-        n_examples = self.val_data['bboxes'].shape[0]
-        n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
-        features = self.val_data['features']
-        images = self.val_data['images']
-        bboxes = self.val_data['bboxes']
-        classes = self.val_data['classes']
-        image_idxs = self.val_data['image_idxs']
-        # val_features = self.val_data['features']
-        # val_iamges = self.val_data['images']
-        # n_iters_val = int(
-            # np.ceil(float(val_features.shape[0]) / self.batch_size))
 
-        # build graphs for training model and sampling captions
-        # loss = self.model.build_model()
-        # print (loss)
-
-        # train op
-        # with tf.name_scope('optimizer'):
-            # optimizer = self.optimizer(learning_rate=self.learning_rate)
-            # grads = tf.gradients(loss, tf.trainable_variables())
-            # grads_and_vars = list(zip(grads, tf.trainable_variables()))
-            # train_op = optimizer.apply_gradients(grads_and_vars=grads_and_vars)
-
-        # tf.get_variable_scope().reuse_variables()
-        # _, _, generated_captions = self.model.build_sampler(max_len=20)
-
-        # tODO generated bboxes for visualization when loc_sd = 0
-
-        # summary op
-        # tf.summary.scalar('batch_loss', loss)
-        # for var in tf.trainable_variables():
-            # tf.summary.histogram(var.op.name, var)
-
-        # for grad, var in grads_and_vars:
-            # tf.summary.histogram(var.op.name + '/gradient', grad)
+        # tf.summary.histogram(var.op.name + '/gradient', grad)
 
         summary_op = tf.summary.merge_all()
+
+        config = tf.ConfigProto(allow_soft_placement=True)
+        # config.gpu_options.per_process_gpu_memory_fraction=0.9
+        # config.gpu_options.allow_growth = True
+
+        with tf.Session(config=config) as sess:
+            tf.global_variables_initializer().run()
+            saver = tf.train.Saver(max_to_keep=10)
+
+            if len(os.listdir(self.pretrained_model)):
+                print(self.pretrained_model)
+                print "Start validation with pretrained Model.."
+                saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
+
+            self.evaluate_model(self.data, global_config.global_config.tb_eval_train_log_dir, summary_op, sess)
+            self.evaluate_model(self.val_data, global_config.global_config.tb_eval_val_log_dir, summary_op, sess)
+
+        sess.close()
+
+
+    # evaluate the policy gradient model by setting sampling standard deviation ~= 0
+    def evaluate_model(self, data, log_path, summary_op, sess):
+        n_examples = data['bboxes'].shape[0]
+        n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
+        features = data['features']
+        images = data['images']
+        bboxes = data['bboxes']
+        classes = data['classes']
+        image_idxs = data['image_idxs']
+
+        summary_writer = tf.summary.FileWriter(log_path, graph=tf.get_default_graph())
+        prev_loss = -1
+        curr_loss = 0
+        start_t = time.time()
+
+        # run all val_data only once on this model
+        rand_idxs = np.random.permutation(n_examples)
+        bboxes = bboxes[rand_idxs]
+        classes = classes[rand_idxs]
+        image_idxs = image_idxs[rand_idxs]
 
         print "The number of epoch: %d" % self.n_epochs
         print "Data size: %d" % n_examples
         print "Batch size: %d" % self.batch_size
         print "Iterations per epoch: %d" % n_iters_per_epoch
 
-        config = tf.ConfigProto(allow_soft_placement=True)
-        # config.gpu_options.per_process_gpu_memory_fraction=0.9
-        # config.gpu_options.allow_growth = True
+        for i in range(n_iters_per_epoch):
+            classes_batch = classes[i * self.batch_size:(i + 1) * self.batch_size]
+            bboxes_batch = bboxes[i * self.batch_size:(i + 1) * self.batch_size]
+            image_idxs_batch = image_idxs[i * self.batch_size:(i + 1) * self.batch_size]
+            features_batch = features[image_idxs_batch]
+            images_batch = images[image_idxs_batch]
+            feed_dict = {self.model.images: images_batch,
+                         self.model.features: features_batch,
+                         self.model.bbox_seqs: bboxes_batch,
+                         self.model.class_seqs: classes_batch}
+            l = sess.run(self.model.batch_loss, feed_dict)
+            curr_loss += l
 
-        # ipdb.set_trace()
-        with tf.Session(config=config) as sess:
-            tf.global_variables_initializer().run()
-            summary_writer = tf.summary.FileWriter(self.val_log_path, graph=tf.get_default_graph())
-            saver = tf.train.Saver(max_to_keep=10)
+            summary = sess.run(summary_op, feed_dict)
+            summary_writer.add_summary(
+                summary, tf.train.global_step(sess, self.model.global_step))
 
-            if len(os.listdir(self.pretrained_model)):
-                print(self.pretrained_model)
-                # if self.mode == 'val':
-                print "Start validation with pretrained Model.."
-                saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
-
-            prev_loss = -1
+            print "Previous epoch loss: ", prev_loss
+            print "Current epoch loss: ", curr_loss
+            print "Elapsed time: ", time.time() - start_t
+            prev_loss = curr_loss
             curr_loss = 0
-            start_t = time.time()
 
-            # run all val_data only once on this model
-            rand_idxs = np.random.permutation(n_examples)
-            bboxes = bboxes[rand_idxs]
-            classes = classes[rand_idxs]
-            image_idxs = image_idxs[rand_idxs]
-
-            for i in range(n_iters_per_epoch):
-                classes_batch = classes[i * self.batch_size:(i + 1) * self.batch_size]
-                bboxes_batch = bboxes[i * self.batch_size:(i + 1) * self.batch_size]
-                image_idxs_batch = image_idxs[i * self.batch_size:(i + 1) * self.batch_size]
-                features_batch = features[image_idxs_batch]
-                images_batch = images[image_idxs_batch]
-                feed_dict = {self.model.images: images_batch,
-                             self.model.features: features_batch,
-                             self.model.bbox_seqs: bboxes_batch,
-                             self.model.class_seqs: classes_batch}
-                l = sess.run(self.model.batch_loss, feed_dict)
-                curr_loss += l
-
-                summary = sess.run(summary_op, feed_dict)
-                summary_writer.add_summary(
-                    summary, tf.train.global_step(sess, self.model.global_step))
-
-                # if (i + 1) % self.print_every == 0:
-                    # print "\nTrain loss at epoch %d & iteration %d (mini-batch): %.5f" % (e + 1 + chunk * 10, i + 1, l)
-                    # ground_truths = bboxes[image_idxs == image_idxs_batch[0]]
-                    # decoded = decode_captions(
-                        # ground_truths, self.model.idx_to_word)
-                    # for j, gt in enumerate(decoded):
-                        # print "Ground truth %d: %s" % (j + 1, gt)
-                    # gen_caps = sess.run(generated_captions, feed_dict)
-                    # decoded = decode_captions(
-                        # gen_caps, self.model.idx_to_word)
-                    # print "Generated caption: %s\n" % decoded[0]
-
-                print "Previous epoch loss: ", prev_loss
-                print "Current epoch loss: ", curr_loss
-                print "Elapsed time: ", time.time() - start_t
-                prev_loss = curr_loss
-                curr_loss = 0
-
-                # print out BLEU scores and file write
-                # if self.print_bleu:
-                    # all_gen_cap = np.ndarray((val_features.shape[0], 20))
-                    # for i in range(n_iters_val):
-                        # features_batch = val_features[i *
-                                                      # self.batch_size:(i + 1) * self.batch_size]
-                        # feed_dict = {self.model.features: features_batch}
-                        # gen_cap = sess.run(
-                            # generated_captions, feed_dict=feed_dict)
-                        # all_gen_cap[i *
-                                    # self.batch_size:(i + 1) * self.batch_size] = gen_cap
-
-                    # all_decoded = decode_captions(
-                        # all_gen_cap, self.model.idx_to_word)
-                    # save_pickle(
-                        # all_decoded, "./data/val/val.candidate.captions.pkl")
-                    # scores = evaluate(data_path='./data',
-                                      # split='val', get_scores=True)
-                    # write_bleu(scores=scores, path=self.model_path, epoch=e + chunk * 10)
-                            # write summary for tensorboard visualization
-        sess.close()
 
     def test(self, data, split='test', attention_visualization=True, save_sampled_captions=True):
         '''

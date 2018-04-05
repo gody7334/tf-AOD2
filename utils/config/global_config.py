@@ -67,14 +67,16 @@ class Global_Config(object):
         self.tf_model_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "model/"
         self.tf_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tf_log/"
         self.tb_train_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_train/"
-        self.tb_eval_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_eval/"
+        self.tb_eval_train_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_eval_train/"
+        self.tb_eval_val_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_eval_val/"
         self.tb_test_log_dir = self.checkpoint_base_dir + self.checkpoint_sub_dir + "tb_test/"
 
         mkdir(self.checkpoint_base_dir+self.checkpoint_sub_dir)
         mkdir(self.tf_model_dir)
         mkdir(self.tf_log_dir)
         mkdir(self.tb_train_log_dir)
-        mkdir(self.tb_eval_log_dir)
+        mkdir(self.tb_eval_train_log_dir)
+        mkdir(self.tb_eval_val_log_dir)
         mkdir(self.tb_test_log_dir)
 
         self.mode = args['mode']
