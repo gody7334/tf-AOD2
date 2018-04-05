@@ -69,6 +69,7 @@ class Solver(object):
             os.makedirs(self.log_path)
 
     def train(self, chunk=0):
+        global_config.global_config.tf_mode = 'train'
         # train/val dataset
         n_examples = self.data['bboxes'].shape[0]
         n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
@@ -207,6 +208,7 @@ class Solver(object):
         sess.close()
 
     def val(self, chunk=0):
+        global_config.global_config.tf_mode = 'val'
         # train/val dataset
         n_examples = self.val_data['bboxes'].shape[0]
         n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
@@ -263,9 +265,9 @@ class Solver(object):
 
             if len(os.listdir(self.pretrained_model)):
                 print(self.pretrained_model)
-                if self.mode == 'val':
-                    print "Start validation with pretrained Model.."
-                    saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
+                # if self.mode == 'val':
+                print "Start validation with pretrained Model.."
+                saver.restore(sess, tf.train.latest_checkpoint(self.pretrained_model))
 
             prev_loss = -1
             curr_loss = 0

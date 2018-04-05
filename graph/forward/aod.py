@@ -226,7 +226,7 @@ class AOD(IForward):
             # sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
             # sample_loc_origin = mean_loc + tf.random_uniform(mean_loc.get_shape(), -0.5, 0.5)*ee
 
-            fixed_wh = 0.1
+            fixed_wh = 0.8
             mean_loc = tf.concat([mean_loc, tf.fill(mean_loc.get_shape(), fixed_wh)], 1)
             sample_loc_origin = tf.concat([sample_loc_origin , tf.fill(sample_loc_origin.get_shape(), fixed_wh)], 1)
 
