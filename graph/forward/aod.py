@@ -75,7 +75,7 @@ class AOD(IForward):
         self.weights = None
 
         if self.mode == 'train':
-            self.loc_sd = 0.05
+            self.loc_sd = 0.2
         else:
             self.loc_sd = 1e-10
 
@@ -197,8 +197,8 @@ class AOD(IForward):
             baseline_b = tf.get_variable('baseline_b', [1], initializer=self.const_initializer )
             # mean_w = tf.get_variable('mean_w', [self.H, self.B],initializer=self.weight_initializer)
             # mean_b = tf.get_variable('mean_b', [self.B],initializer=self.point5_initializer)
-            mean_w = tf.get_variable('mean_w', [self.H, self.B*self.glimpse_w],initializer=self.weight_initializer)
-            mean_b = tf.get_variable('mean_b', [self.B*self.glimpse_w],initializer=self.const_initializer )
+            mean_w = tf.get_variable('mean_w', [self.H, self.B*self.WW],initializer=self.weight_initializer)
+            mean_b = tf.get_variable('mean_b', [self.B*self.WW],initializer=self.const_initializer )
 
             # train a baseline_beline function
             # baseline might out of boundry.
@@ -230,18 +230,26 @@ class AOD(IForward):
             self.sample_locs_score_list.append(sample_loc_origin)
 
             # maxargs to select the max index for (xmin, ymin, w, h)def, range is 0 ~ 6, used in ROI pooling
-            mean_loc = tf.squeeze(tf.argmax(tf.reshape(mean_loc, [self.NN, self.B, self.glimpse_w]), axis=2))
-            sample_loc_origin = tf.squeeze(tf.argmax(tf.reshape(sample_loc_origin, [self.NN, self.B, self.glimpse_w]), axis=2))
+            mean_loc = tf.squeeze(tf.argmax(tf.reshape(mean_loc, [self.NN, self.B, self.WW]), axis=2))
+            sample_loc_origin = tf.squeeze(tf.argmax(tf.reshape(sample_loc_origin, [self.NN, self.B, self.WW]), axis=2))
+            mean_loc =_debug_func(mean_loc,'region_proposal_mean_loc_discrete_mscoco',break_point=False, to_file=True)
+
             sample_locs_discrete = self._convert_coordinate(sample_loc_origin, "mscoco", "bmp",dim=2)
+            sample_locs_discrete =_debug_func(sample_locs_discrete,'region_proposal_sample_loc_origin_discrete_bmp',break_point=False, to_file=True)
             self.sample_locs_discrete_list.append(sample_locs_discrete)
 
             # shift w h from 0~6 to 1~7
             mean_loc = tf.cast(mean_loc,tf.float32) + tf.cast(tf.convert_to_tensor(np.array([0.0,0.0,1.0,1.0])),tf.float32)
+            mean_loc =_debug_func(mean_loc,'region_proposal_mean_loc_discrete_mscoco_shift',break_point=False, to_file=True)
             sample_loc_origin = tf.cast(sample_loc_origin,tf.float32) + tf.cast(tf.convert_to_tensor(np.array([0.0,0.0,1.0,1.0])),tf.float32)
-            mean_loc = mean_loc / self.glimpse_w
-            sample_loc_origin = sample_loc_origin / self.glimpse_w
+            sample_loc_origin =_debug_func(sample_loc_origin,'region_proposal_sample_loc_origin_discrete_mscoco_shift',break_point=False, to_file=True)
+            mean_loc = mean_loc / (self.WW+1)
+            sample_loc_origin = sample_loc_origin / (self.WW+1)
             mean_loc = self._convert_coordinate(mean_loc , "mscoco", "frcnn",dim=2)
             sample_loc_origin = self._convert_coordinate(sample_loc_origin , "mscoco", "frcnn",dim=2)
+
+            mean_loc =_debug_func(mean_loc,'region_proposal_mean_loc',break_point=False, to_file=True)
+            sample_loc_origin =_debug_func(sample_loc_origin,'region_proposal_sample_loc_origin',break_point=False, to_file=True)
 
             self.mean_locs_list.append(mean_loc)
             self.sample_locs_origin_list.append(sample_loc_origin)
@@ -340,10 +348,10 @@ class AOD(IForward):
         rp_h = tf.slice(roises, [0,3],[-1,1])
 
         # convert from WW, HH to 0~1
-        rp_xmid = rp_xmid/(self.WW-1)
-        rp_ymid = rp_ymid/(self.HH-1)
-        rp_w = rp_w/(self.WW-1)
-        rp_h = rp_h/(self.HH-1)
+        rp_xmid = rp_xmid/(self.WW+1)
+        rp_ymid = rp_ymid/(self.HH+1)
+        rp_w = rp_w/(self.WW+1)
+        rp_h = rp_h/(self.HH+1)
 
         bbox_xmid = tf.slice(bboxes, [0,0],[-1,1])
         bbox_ymid = tf.slice(bboxes, [0,1],[-1,1])
@@ -508,6 +516,10 @@ class AOD(IForward):
         iou =_debug_func(iou ,'policy_iou',break_point=False, to_file=True)
         baseline_iou =_debug_func(baseline_iou ,'policy_baseline_iou',break_point=False, to_file=True)
 
+        mean_location_input =_debug_func(mean_location_input,'policy_mean_location_input',break_point=False, to_file=True)
+        sample_location_input =_debug_func(sample_location_input ,'policy_sample_location_input',break_point=False, to_file=True)
+        sample_location_origin =_debug_func(sample_location_origin ,'policy_sample_location_origin',break_point=False, to_file=True)
+
         invalid_mean_loc = self._invalid_bbox(mean_location_input)
         invalid_sample_loc = self._invalid_bbox(sample_location_origin)
         invalid_sample_loc = tf.fill(invalid_sample_loc.get_shape(),0.0)
@@ -516,23 +528,23 @@ class AOD(IForward):
 
         # rewards
         rewards_scale = 1e1
-        invalid_scale = 1e0
+        invalid_scale = 1e1
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
         # rewards = (tf.squeeze(iou,[1,2]) * predict_target_prob)*rewards_scale
         # rewards = (tf.reduce_sum(iou,[2]))*rewards_scale - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
-        rewards = rewards_scale*tf.reduce_sum(iou,[2])*predict_target_prob - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
+        rewards = rewards_scale*tf.reduce_sum(iou,[2])*predict_target_prob
         rewards =_debug_func(rewards ,'policy_rewards_step',break_point=False, to_file=True)
         cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
+        cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         cum_rewards =_debug_func(cum_rewards,'policy_cum_rewards',break_point=False, to_file=True)
 
         self.rewards = rewards
 
-        mean_location_input =_debug_func(mean_location_input,'policy_mean_location_input',break_point=False, to_file=True)
-        sample_location_input =_debug_func(sample_location_input ,'policy_sample_location_input',break_point=False, to_file=True)
-        sample_location_origin =_debug_func(sample_location_origin ,'policy_sample_location_origin',break_point=False, to_file=True)
-
         mean_locs_scores = tf.transpose(tf.stack(self.mean_locs_score_list),(1,0,2))
         sample_locs_scores = tf.transpose(tf.stack(self.sample_locs_score_list),(1,0,2))
+        mean_locs_scores =_debug_func(mean_locs_scores ,'policy_mean_locs_scores',break_point=False, to_file=True)
+        sample_locs_scores =_debug_func(sample_locs_scores ,'policy_sample_locs_scores',break_point=False, to_file=True)
+
         # construct schocastic policy using mean and sample location
         # p_loc = gaussian_pdf(mean_location_input, sample_location_input)
         p_loc = gaussian_pdf(mean_locs_scores, sample_locs_scores)
@@ -540,7 +552,7 @@ class AOD(IForward):
         p_loc =_debug_func(p_loc ,'policy_p_loc',break_point=False, to_file=True)
 
         # likelihood estimator
-        J = tf.reduce_sum(tf.reduce_sum(tf.log(p_loc + 1e-10),[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
+        J = tf.reduce_sum(tf.reduce_mean(tf.log(p_loc + 1e-10),[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
         # J = tf.reduce_sum(tf.reduce_sum(p_loc + 1e-10,[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
         J = J - tf.reduce_sum(tf.square(cum_rewards - baseline_iou), 1)
         J =_debug_func(J ,'policy_J',break_point=False, to_file=True)

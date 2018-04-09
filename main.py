@@ -44,6 +44,8 @@ def prepare():
     elif global_config.global_config.device == "gpu1":
         os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
+    clean_folder(global_config.global_config.tf_log_dir)
+
 def clean_folder(folder_dir):
     for the_file in os.listdir(folder_dir):
         file_path = os.path.join(folder_dir, the_file)
