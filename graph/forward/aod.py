@@ -54,7 +54,7 @@ class AOD(IForward):
         self.D = None # depend on desired inception layer
         self.M = 512 # word embedded
         self.H = self.config.num_lstm_units # hidden stage
-        self.T = 45 # Time step size of LSTM (how many predicting bboxes in a image)
+        self.T = 21 # Time step size of LSTM (how many predicting bboxes in a image)
         self.B = 4 # bbox dimension
 
         self.NN = self.config.batch_size # batch size
@@ -75,7 +75,7 @@ class AOD(IForward):
         self.weights = None
 
         if self.mode == 'train':
-            self.loc_sd = 0.1
+            self.loc_sd = 0.15
         else:
             self.loc_sd = 1e-10
 
@@ -207,7 +207,7 @@ class AOD(IForward):
             # eye_center to the previous sample_loc:
             # high bias, bias to previous stage ,loc
             # low variance, limit to previous stage, loc
-            eye_center = False
+            eye_center = True
             if eye_center == False:
                 mean_loc = tf.matmul(h,mean_w)+mean_b
             else:
