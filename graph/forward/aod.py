@@ -54,7 +54,7 @@ class AOD(IForward):
         self.D = None # depend on desired inception layer
         self.M = 512 # word embedded
         self.H = self.config.num_lstm_units # hidden stage
-        self.T = 21 # Time step size of LSTM (how many predicting bboxes in a image)
+        self.T = 45 # Time step size of LSTM (how many predicting bboxes in a image)
         self.B = 4 # bbox dimension
 
         self.NN = self.config.batch_size # batch size
@@ -191,9 +191,9 @@ class AOD(IForward):
         # Here bbox def: (xmid,ymid,w,h) as easy to limit the boundry(0~1) and avoid revert coor
         with tf.variable_scope('attension_region_proposal_layer',reuse=reuse):
             baseline_w = tf.get_variable('baseline_w', [self.H, 1],initializer=self.weight_initializer)
-            baseline_b = tf.get_variable('baseline_b', [1], initializer=self.point5_initializer)
+            baseline_b = tf.get_variable('baseline_b', [1], initializer=self.const_initializer)
             mean_w = tf.get_variable('mean_w', [self.H, self.B],initializer=self.weight_initializer)
-            mean_b = tf.get_variable('mean_b', [self.B],initializer=self.point5_initializer)
+            mean_b = tf.get_variable('mean_b', [self.B],initializer=tf.random_uniform_initializer(minval=0.0, maxval=1.0))
             # mean_w = tf.get_variable('mean_w', [self.H, 2],initializer=self.weight_initializer)
             # mean_b = tf.get_variable('mean_b', [2],initializer=self.point5_initializer)
 
@@ -221,7 +221,6 @@ class AOD(IForward):
             # as agent to decide the mean_loc vs sample_los is good or bad
             # ee = tf.cast(tf.greater(tf.random_uniform(mean_loc.get_shape(), 0, 1.0),self.ee_ratio),tf.float32)+1
             sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
-            # sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
             # sample_loc_origin = mean_loc + tf.random_uniform(mean_loc.get_shape(), -0.5, 0.5)*ee
 
             # fixed_wh = 0.8
@@ -517,7 +516,7 @@ class AOD(IForward):
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
         # rewards = (tf.squeeze(iou,[1,2]) * predict_target_prob)*rewards_scale
         # rewards = (tf.reduce_sum(iou,[2]))*rewards_scale - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
-        rewards = rewards_scale*tf.reduce_sum(iou,[2])*predict_target_prob
+        rewards = rewards_scale*tf.squeeze(iou,[2])*predict_target_prob
         rewards =_debug_func(rewards ,'policy_rewards_step',break_point=False, to_file=True)
         cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
         cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
