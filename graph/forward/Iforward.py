@@ -338,10 +338,17 @@ class IForward(object):
 
     def _invalid_bbox(self, bbox, name="invalid_bbox"):
         with tf.name_scope(name):
-            bbox_to_center = tf.abs(bbox-0.5)-0.5
-            mask = tf.cast(tf.greater(bbox_to_center,0),tf.float32)
-            invalid_bbox_l1 = tf.multiply(bbox_to_center,mask)
-            return invalid_bbox_l1
+            greater_than_one = tf.cast(tf.greater(bbox,1),tf.float32)
+            smaller_than_zero = tf.cast(tf.less(bbox,0),tf.float32)
+            greater_than_one = (bbox-1)*greater_than_one
+            smaller_than_zero = bbox*smaller_than_zero
+            invalid_bbox_l2 = tf.square(greater_than_one + smaller_than_zero)
+            return invalid_bbox_l2
+
+            # bbox_to_center = tf.square(bbox-0.5)-0.25
+            # mask = tf.cast(tf.greater(bbox_to_center,0),tf.float32)
+            # invalid_bbox_l1 = tf.multiply(bbox_to_center,mask)
+            # return invalid_bbox_l1
 
     def bb_intersection_over_union(self, boxA, boxB):
         '''
