@@ -350,6 +350,12 @@ class IForward(object):
             # invalid_bbox_l1 = tf.multiply(bbox_to_center,mask)
             # return invalid_bbox_l1
 
+    def _invalid_area(self, bbox, name="invalid_bbox_area"):
+        with tf.name_scope(name):
+           w = tf.slice(bbox,[0,0,2],[-1,-1,1])
+           h = tf.slice(bbox,[0,0,3],[-1,-1,1])
+           bbox_area = w*h
+
     def bb_intersection_over_union(self, boxA, boxB):
         '''
         IOU exmaple

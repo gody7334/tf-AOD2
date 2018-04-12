@@ -78,6 +78,20 @@ class Solver(object):
         bboxes = self.data['bboxes']
         classes = self.data['classes']
         image_idxs = self.data['image_idxs']
+
+        area_upper_bound = 1
+        area_lower_bound = 0.3
+        bboxes_area = bboxes[:,:,2]*bboxes[:,:,3]
+        bboxes_area_zero_mask = bboxes_area == 0
+        bboxes_area_threshlod_mask = (bboxes_area > area_lower_bound) * (bboxes_area <= area_upper_bound)
+        bboxes_mask = np.prod(bboxes_area_threshlod_mask + bboxes_area_zero_mask, axis=1)
+        bboxes_index = np.argwhere(bboxes_mask==1)
+
+        bboxes = bboxes[bboxes_index]
+        classes = classes[bboxes_index]
+        image_idxs = image_idxs[bboxes_index]
+        n_examples = bboxes_index.shape[0]
+
         # val_features = self.val_data['features']
         # val_iamges = self.val_data['images']
         # n_iters_val = int(
@@ -293,7 +307,7 @@ class Solver(object):
             - image_idxs: Indices for mapping caption to image of shape (24210, )
             - features_to_captions: Mapping feature to captions (5000, 4~5)
             - split: 'train', 'val' or 'test'
-            - attention_visualization: If True, visualize attention weights with images for each sampled word. (ipthon notebook)
+22            - attention_visualization: If True, visualize attention weights with images for each sampled word. (ipthon notebook)
             - save_sampled_captions: If True, save sampled captions to pkl file for computing BLEU scores.
         '''
 
