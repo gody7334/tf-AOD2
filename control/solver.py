@@ -69,28 +69,29 @@ class Solver(object):
             os.makedirs(self.log_path)
 
     def train(self, chunk=0):
+        gc = global_config.global_config
         global_config.global_config.tf_mode = 'train'
-        # train/val dataset
-        n_examples = self.data['bboxes'].shape[0]
-        n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
+
         features = self.data['features']
         images = self.data['images']
         bboxes = self.data['bboxes']
         classes = self.data['classes']
         image_idxs = self.data['image_idxs']
 
-        area_upper_bound = 1
-        area_lower_bound = 0.3
         bboxes_area = bboxes[:,:,2]*bboxes[:,:,3]
         bboxes_area_zero_mask = bboxes_area == 0
-        bboxes_area_threshlod_mask = (bboxes_area > area_lower_bound) * (bboxes_area <= area_upper_bound)
+        bboxes_area_threshlod_mask = (bboxes_area > gc.area_lower_bound) * (bboxes_area <= gc.area_upper_bound)
         bboxes_mask = np.prod(bboxes_area_threshlod_mask + bboxes_area_zero_mask, axis=1)
         bboxes_index = np.argwhere(bboxes_mask==1)
 
-        bboxes = bboxes[bboxes_index]
-        classes = classes[bboxes_index]
-        image_idxs = image_idxs[bboxes_index]
+        bboxes = np.squeeze(bboxes[bboxes_index])
+        classes = np.squeeze(classes[bboxes_index])
+        image_idxs = np.squeeze(image_idxs[bboxes_index])
+
+        # train/val dataset
+        # n_examples = self.data['bboxes'].shape[0]
         n_examples = bboxes_index.shape[0]
+        n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
 
         # val_features = self.val_data['features']
         # val_iamges = self.val_data['images']

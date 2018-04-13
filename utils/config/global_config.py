@@ -47,7 +47,6 @@ def assign_config():
     global global_config
     global_config = Global_Config()
 
-
 class Global_Config(object):
 
     def __init__(self):
@@ -95,6 +94,10 @@ class Global_Config(object):
         #training directory.
         self.train_dir = self.tb_train_log_dir
         self.train_checkpoint_log_dir = self.tf_model_dir
+
+        # filter area
+        self.area_upper_bound = 1
+        self.area_lower_bound = 0.3
 
         #log directory.
         self.log_dir = self.tf_log_dir

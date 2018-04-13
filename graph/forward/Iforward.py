@@ -352,9 +352,16 @@ class IForward(object):
 
     def _invalid_area(self, bbox, name="invalid_bbox_area"):
         with tf.name_scope(name):
+           gc = global_config.global_config
            w = tf.slice(bbox,[0,0,2],[-1,-1,1])
            h = tf.slice(bbox,[0,0,3],[-1,-1,1])
-           bbox_area = w*h
+           bbox_area = tf.squeeze(w*h)
+           greater_than_upper = tf.cast(tf.greater(bbox_area,gc.area_upper_bound),tf.float32)
+           smaller_than_lower = tf.cast(tf.less(bbox_area,gc.area_lower_bound),tf.float32)
+           greater_than_upper = (bbox_area-gc.area_upper_bound) * greater_than_upper
+           smaller_than_lower = (gc.area_lower_bound-bbox_area) * smaller_than_lower
+           invalid_area_l2 = tf.square(greater_than_upper + smaller_than_lower)
+           return invalid_area_l2
 
     def bb_intersection_over_union(self, boxA, boxB):
         '''
