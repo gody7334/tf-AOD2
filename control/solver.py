@@ -146,9 +146,7 @@ class Solver(object):
             curr_loss = 0
             start_t = time.time()
 
-            e = 0
-            step = 0
-            for e in range(self.n_epochs):
+            for gc.train_epoch_count in range(self.n_epochs):
                 rand_idxs = np.random.permutation(n_examples)
                 bboxes = bboxes[rand_idxs]
                 classes = classes[rand_idxs]
@@ -168,8 +166,8 @@ class Solver(object):
                     curr_loss += l
 
                     # write summary for tensorboard visualization
-                    step += 1
-                    if step % global_config.global_config.log_every_n_steps == 0:
+                    gc.train_step_count += 1
+                    if gc.train_step_count % global_config.global_config.log_every_n_steps == 0:
                         summary = sess.run(summary_op, feed_dict)
                         summary_writer.add_summary(
                             summary, tf.train.global_step(sess, self.model.global_step))
@@ -213,8 +211,10 @@ class Solver(object):
                     # write_bleu(scores=scores, path=self.model_path, epoch=e + chunk * 10)
 
                 # save model's parameters
-                e+=1
-                if (e + 1) % self.save_every == 0:
+                gc.train_epoch_count +=1
+                if (gc.train_epoch_count + 1) % self.save_every == 0:
+                    import main
+                    main.clean_foler(os.path.join(self.model_path, 'model'))
                     saver.save(sess,
                             os.path.join(self.model_path, 'model'),
                             tf.train.global_step(sess, self.model.global_step))

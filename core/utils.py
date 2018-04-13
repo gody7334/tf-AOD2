@@ -5,23 +5,23 @@ import time
 import os
 
 
-def load_coco_data(data_path='./data/data', split='train', if_train=True):
+def load_coco_data(data_path='./data/data', split='train', if_train=True, part=0):
     data_path = os.path.join(data_path, split)
     start_t = time.time()
     data = {}
 
     data['features'] = hickle.load(os.path.join(
-        data_path, '%s.features.hkl' % split))
+        data_path, '%s.features.part%d.hkl' % (split,part)))
     data['images'] = hickle.load(os.path.join(
-        data_path, '%s.images.hkl' % split))
+        data_path, '%s.images.part%d.hkl' % (split,part)))
 
-    with open(os.path.join(data_path, '%s.file.names.pkl' % split), 'rb') as f:
+    with open(os.path.join(data_path, '%s.file.names.part%d.pkl' % (split,part)), 'rb') as f:
         data['file_names'] = pickle.load(f)
-    with open(os.path.join(data_path, '%s.bboxes.pkl' % split), 'rb') as f:
+    with open(os.path.join(data_path, '%s.bboxes.part%d.pkl' % (split,part)), 'rb') as f:
         data['bboxes'] = pickle.load(f)
-    with open(os.path.join(data_path, '%s.classes.pkl' % split), 'rb') as f:
+    with open(os.path.join(data_path, '%s.classes.part%d.pkl' % (split,part)), 'rb') as f:
         data['classes'] = pickle.load(f)
-    with open(os.path.join(data_path, '%s.image.idxs.pkl' % split), 'rb') as f:
+    with open(os.path.join(data_path, '%s.image.idxs.part%d.pkl' % (split,part)), 'rb') as f:
         data['image_idxs'] = pickle.load(f)
 
     for k, v in data.iteritems():

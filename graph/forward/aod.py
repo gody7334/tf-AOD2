@@ -513,13 +513,14 @@ class AOD(IForward):
         # rewards
         rewards_scale = 1e1
         invalid_scale = 1e0
+        invalid_area_scale = 1e-1
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
         # rewards = (tf.squeeze(iou,[1,2]) * predict_target_prob)*rewards_scale
         # rewards = (tf.reduce_sum(iou,[2]))*rewards_scale - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         rewards = rewards_scale*tf.squeeze(iou,[2])*predict_target_prob
         rewards =_debug_func(rewards ,'policy_rewards_step',break_point=False, to_file=True)
         cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
-        cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_mean_loc),[2])) - invalid_mean_area
+        cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_mean_loc),[2])) - invalid_mean_area*invalid_area_scale
         # cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         cum_rewards =_debug_func(cum_rewards,'policy_cum_rewards',break_point=False, to_file=True)
 

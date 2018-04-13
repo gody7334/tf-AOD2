@@ -87,6 +87,11 @@ class Global_Config(object):
         self.train_n_epoch = 50
         self.log_every_n_steps = 400
 
+        self.train_step_count = 0
+        self.train_epoch_count = 0
+        self.val_step_count = 0
+        self.val_epoch_count = 0
+
         # File pattern of sharded TFRecord file containing SequenceExample protos.
         # Must be pmrovided in training and evaluation modes.
         self.input_file_pattern = None
@@ -97,7 +102,7 @@ class Global_Config(object):
 
         # filter area
         self.area_upper_bound = 1
-        self.area_lower_bound = 0.3
+        self.area_lower_bound = 0.000000000001
 
         #log directory.
         self.log_dir = self.tf_log_dir
