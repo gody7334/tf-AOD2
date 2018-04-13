@@ -4,7 +4,7 @@ import skimage.transform
 import numpy as np
 import time
 from time import sleep
-import os
+import os, shutil, os.path
 import cPickle as pickle
 from scipy import ndimage
 from utils import *
@@ -213,8 +213,20 @@ class Solver(object):
                 # save model's parameters
                 gc.train_epoch_count +=1
                 if (gc.train_epoch_count + 1) % self.save_every == 0:
-                    import main
-                    main.clean_foler(os.path.join(self.model_path, 'model'))
+                    def clean_folder(folder_dir):
+                        for the_file in os.listdir(folder_dir):
+                            file_path = os.path.join(folder_dir, the_file)
+                            rm_file(file_path)
+
+                    def rm_file(file_path):
+                        try:
+                            if os.path.isfile(file_path):
+                                os.unlink(file_path)
+                            #elif os.path.isdir(file_path): shutil.rmtree(file_path)
+                        except Exception as e:
+                            print(e)
+
+                    clean_foler(os.path.join(self.model_path, 'model'))
                     saver.save(sess,
                             os.path.join(self.model_path, 'model'),
                             tf.train.global_step(sess, self.model.global_step))
