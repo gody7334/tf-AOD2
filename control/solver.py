@@ -226,7 +226,7 @@ class Solver(object):
                         except Exception as e:
                             print(e)
 
-                    clean_foler(os.path.join(self.model_path, 'model'))
+                    clean_folder(self.model_path)
                     saver.save(sess,
                             os.path.join(self.model_path, 'model'),
                             tf.train.global_step(sess, self.model.global_step))
