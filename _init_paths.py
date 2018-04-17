@@ -16,6 +16,12 @@ add_path(package_path)
 package_path = osp.join(this_dir, '.', 'utils')
 add_path(package_path)
 
+package_path = osp.join(this_dir, '.', 'core')
+add_path(package_path)
+
+package_path = osp.join(this_dir, '.', 'utils', 'config')
+add_path(package_path)
+
 # package_path = osp.join(this_dir, '.', 'graph', 'ops')
 # add_path(package_path)
 

@@ -1,8 +1,8 @@
+import _init_paths
 from control.solver import Solver
-from core.utils import load_coco_data
+from core.load_dataset import load_coco_data
 
 import os, shutil
-import _init_paths
 import ipdb
 from random import randint
 import os.path

@@ -7,11 +7,10 @@ from time import sleep
 import os, shutil, os.path
 import cPickle as pickle
 from scipy import ndimage
-from utils import *
 import ipdb
 from pprint import pprint as pp
-
 from utils.config import global_config
+from core.load_dataset import *
 
 class Solver(object):
     def __init__(self, model, optimizer, data, val_data, **kwargs):
@@ -78,19 +77,9 @@ class Solver(object):
         classes = self.data['classes']
         image_idxs = self.data['image_idxs']
 
-        bboxes_area = bboxes[:,:,2]*bboxes[:,:,3]
-        bboxes_area_zero_mask = bboxes_area == 0
-        bboxes_area_threshlod_mask = (bboxes_area > gc.area_lower_bound) * (bboxes_area <= gc.area_upper_bound)
-        bboxes_mask = np.prod(bboxes_area_threshlod_mask + bboxes_area_zero_mask, axis=1)
-        bboxes_index = np.argwhere(bboxes_mask==1)
-
-        bboxes = np.squeeze(bboxes[bboxes_index])
-        classes = np.squeeze(classes[bboxes_index])
-        image_idxs = np.squeeze(image_idxs[bboxes_index])
-
         # train/val dataset
-        # n_examples = self.data['bboxes'].shape[0]
-        n_examples = bboxes_index.shape[0]
+        n_examples = self.data['bboxes'].shape[0]
+        # n_examples = bboxes_index.shape[0]
         n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
 
         # val_features = self.val_data['features']
@@ -158,12 +147,13 @@ class Solver(object):
                     image_idxs_batch = image_idxs[i * self.batch_size:(i + 1) * self.batch_size]
                     features_batch = features[image_idxs_batch]
                     images_batch = images[image_idxs_batch]
-                    feed_dict = {self.model.images: images_batch,
-                                 self.model.features: features_batch,
-                                 self.model.bbox_seqs: bboxes_batch,
-                                 self.model.class_seqs: classes_batch}
-                    _, l = sess.run([self.optimizer.train_op, self.model.batch_loss], feed_dict)
-                    curr_loss += l
+                    for r in range(gc.replay_times):
+                        feed_dict = {self.model.images: images_batch,
+                                     self.model.features: features_batch,
+                                     self.model.bbox_seqs: bboxes_batch,
+                                     self.model.class_seqs: classes_batch}
+                        _, l = sess.run([self.optimizer.train_op, self.model.batch_loss], feed_dict)
+                        curr_loss += l
 
                     # write summary for tensorboard visualization
                     gc.train_step_count += 1
@@ -299,9 +289,10 @@ class Solver(object):
             l = sess.run(self.model.batch_loss, feed_dict)
             curr_loss += l
 
-            summary = sess.run(summary_op, feed_dict)
-            summary_writer.add_summary(
-                summary, tf.train.global_step(sess, self.model.global_step))
+            if i % 100 == 0:
+                summary = sess.run(summary_op, feed_dict)
+                summary_writer.add_summary(
+                    summary, tf.train.global_step(sess, self.model.global_step))
 
             print "Previous epoch loss: ", prev_loss
             print "Current epoch loss: ", curr_loss

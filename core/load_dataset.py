@@ -3,7 +3,7 @@ import cPickle as pickle
 import hickle
 import time
 import os
-
+from utils.config import global_config
 
 def load_coco_data(data_path='./data/data', split='train', if_train=True, part=0):
     data_path = os.path.join(data_path, split)
@@ -23,6 +23,18 @@ def load_coco_data(data_path='./data/data', split='train', if_train=True, part=0
         data['classes'] = pickle.load(f)
     with open(os.path.join(data_path, '%s.image.idxs.part%d.pkl' % (split,part)), 'rb') as f:
         data['image_idxs'] = pickle.load(f)
+
+    gc = global_config.global_config
+    bboxes_area = data['bboxes'][:,:,2]*data['bboxes'][:,:,3]
+    bboxes_area_zero_mask = bboxes_area == 0
+    bboxes_area_threshlod_mask = (bboxes_area > gc.area_lower_bound) * (bboxes_area <= gc.area_upper_bound)
+    bboxes_mask = np.prod(bboxes_area_threshlod_mask + bboxes_area_zero_mask, axis=1)
+    bboxes_index = np.argwhere(bboxes_mask==1)
+
+    data['file_names'] = np.squeeze(data['file_names'][bboxes_index])
+    data['bboxes'] = np.squeeze(data['bboxes'][bboxes_index])
+    data['classes'] = np.squeeze(data['classes'][bboxes_index])
+    data['image_idxs'] = np.squeeze(data['image_idxs'][bboxes_index])
 
     for k, v in data.iteritems():
         if type(v) == np.ndarray:
