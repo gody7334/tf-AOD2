@@ -233,7 +233,7 @@ class Solver(object):
 
         config = tf.ConfigProto(allow_soft_placement=True)
         # config.gpu_options.per_process_gpu_memory_fraction=0.9
-        # config.gpu_options.allow_growth = True
+        config.gpu_options.allow_growth = True
 
         with tf.Session(config=config) as sess:
             tf.global_variables_initializer().run()
@@ -289,7 +289,7 @@ class Solver(object):
             l = sess.run(self.model.batch_loss, feed_dict)
             curr_loss += l
 
-            if i % 100 == 0:
+            if i % (n_iters_per_epoch/2) == 0:
                 summary = sess.run(summary_op, feed_dict)
                 summary_writer.add_summary(
                     summary, tf.train.global_step(sess, self.model.global_step))
