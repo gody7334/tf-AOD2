@@ -1,9 +1,11 @@
+import _init_paths
 from control.solver import Solver
-from core.utils import load_coco_data
+from core.load_dataset import load_coco_data
 
 import os, shutil
-import _init_paths
 import ipdb
+from random import randint
+import os.path
 
 from utils.config import global_config
 from graph.forward.aod import AOD
@@ -15,14 +17,16 @@ def main():
     prepare()
 
     if global_config.global_config.mode == 'train':
-        data = load_coco_data(data_path='./data/data', split='train', if_train=True)
-        val_data = load_coco_data(data_path='./data/data', split='val', if_train=False)
         model =AOD(mode='train',data=None)
         optimizer = Backward(model = model)
-        solver = Solver(model, optimizer, data, val_data)
+        solver = Solver(model, optimizer, None, None)
         while(True):
-            solver.train()
-            solver.val()
+            part = randint(0,128)
+            if os.path.isfile(os.path.join('./data/data/train', '%s.file.names.part%d.pkl' % ('train',part))):
+                solver.data = load_coco_data(data_path='./data/data', split='train', if_train=True, part=part)
+                solver.val_data = load_coco_data(data_path='./data/data', split='val', if_train=False, part=part)
+                solver.train()
+                solver.val()
 
     elif global_config.global_config.mode == 'val':
         data = None

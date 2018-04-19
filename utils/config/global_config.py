@@ -47,7 +47,6 @@ def assign_config():
     global global_config
     global_config = Global_Config()
 
-
 class Global_Config(object):
 
     def __init__(self):
@@ -85,8 +84,17 @@ class Global_Config(object):
         if args['log'] == "t":
             self.is_tf_log=True
 
+        # train
         self.train_n_epoch = 50
-        self.log_every_n_steps = 400
+        # replay times
+        self.replay_times = 5
+
+        # global varialbe to control summary write
+        self.log_every_n_steps = 500
+        self.train_step_count = 0
+        self.train_epoch_count = 0
+        self.val_step_count = 0
+        self.val_epoch_count = 0
 
         # File pattern of sharded TFRecord file containing SequenceExample protos.
         # Must be pmrovided in training and evaluation modes.
@@ -95,6 +103,10 @@ class Global_Config(object):
         #training directory.
         self.train_dir = self.tb_train_log_dir
         self.train_checkpoint_log_dir = self.tf_model_dir
+
+        # filter area
+        self.area_upper_bound = 1
+        self.area_lower_bound = 0.000000001
 
         #log directory.
         self.log_dir = self.tf_log_dir

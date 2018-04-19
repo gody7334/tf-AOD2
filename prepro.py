@@ -145,6 +145,7 @@ def _build_vocab(annotations, threshold=1):
 def _build_bbox_vector(annotations, max_length=30):
     n_examples = len(annotations)
     bboxes = np.ndarray((n_examples,max_length,4)).astype(np.float32)
+    annotations = annotations.reset_index()
     for i in range(len(annotations)):
         # pad short bbox with the special [0,0,0,0] to make it fixed-size vector
         bbox = annotations.loc[i,'bbox']
@@ -236,54 +237,62 @@ def main():
     reload_json = False
     if(reload_json):
         # about 80000 images
-        instance_file = 'instances_train2014.json'
-        # instance_file='/dataset/mscoco/raw-data/annotations/instances_train2014.json'
+        # instance_file = 'instances_train2014.json'
+        instance_file='/dataset/mscoco/raw-data/annotations/instances_train2014.json'
         train_dataset = _process_instance_data(instance_file=instance_file,
                                               image_dir='data/image/train2014_resized/',
                                               max_length=max_length)
         # about 40000 images
-        instance_file = 'instances_val2014.json'
-        # instance_file='/dataset/mscoco/raw-data/annotations/instances_val2014.json'
+        # instance_file = 'instances_val2014.json'
+        instance_file='/dataset/mscoco/raw-data/annotations/instances_val2014.json'
         val_dataset = _process_instance_data(instance_file=instance_file,
                                               image_dir='data/image/val2014_resized/',
                                               max_length=max_length)
 
-        # about 800, 400 and 400 images for train / val / test dataset
-        train_cutoff = int(0.01*len(train_dataset))
-        val_cutoff = int(0.01 * len(val_dataset))
-        test_cutoff = int(0.02 * len(val_dataset))
+        # about 80000, 20000 and 20000 images for train / val / test dataset
+        train_cutoff = int(len(train_dataset))
+        val_cutoff = int(0.5*len(val_dataset))
+        test_cutoff = int(1.0*len(val_dataset))
         print 'Finished processing instance data'
 
         save_pickle(train_dataset[:train_cutoff], 'data/data/train/train.annotations.pkl')
         save_pickle(val_dataset[:val_cutoff], 'data/data/val/val.annotations.pkl')
         save_pickle(val_dataset[val_cutoff:test_cutoff].reset_index(drop=True), 'data/data/test/test.annotations.pkl')
+        print "finished save annotation.pkl"
 
-    for split in ['train', 'val', 'test']:
-        annotations = load_pickle('./data/data/%s/%s.annotations.pkl' % (split, split))
+    generate_label_pickle = False
+    if generate_label_pickle:
+        for split in ['train', 'val', 'test']:
+            annotation_all = load_pickle('./data/data/%s/%s.annotations.pkl' % (split, split))
+            max_length = _get_bboxes_max_length(annotations=annotation_all)
+            num_of_parts = 128
+            n_samples = len(annotation_all)
+            samples_per_parts = int(n_samples / num_of_parts)
 
-        max_length = _get_bboxes_max_length(annotations=annotations)
-        (bboxes,classes) = _build_bbox_vector(annotations=annotations, max_length=max_length)
-        save_pickle(bboxes, './data/data/%s/%s.bboxes.pkl' % (split, split))
-        save_pickle(classes, './data/data/%s/%s.classes.pkl' % (split, split))
+            for parts in range(num_of_parts):
+                annotations = annotation_all.iloc[samples_per_parts*parts:samples_per_parts*(parts+1)]
+                (bboxes,classes) = _build_bbox_vector(annotations=annotations, max_length=max_length)
+                save_pickle(bboxes, './data/data/%s/%s.bboxes.part%d.pkl' % (split, split, parts))
+                save_pickle(classes, './data/data/%s/%s.classes.part%d.pkl' % (split, split, parts))
 
-        file_names, id_to_idx = _build_file_names(annotations)
-        save_pickle(file_names, './data/data/%s/%s.file.names.pkl' % (split, split))
+                file_names, id_to_idx = _build_file_names(annotations)
+                save_pickle(file_names, './data/data/%s/%s.file.names.part%d.pkl' % (split, split, parts))
 
-        image_idxs = _build_image_idxs(annotations, id_to_idx)
-        save_pickle(image_idxs, './data/data/%s/%s.image.idxs.pkl' % (split, split))
+                image_idxs = _build_image_idxs(annotations, id_to_idx)
+                save_pickle(image_idxs, './data/data/%s/%s.image.idxs.part%d.pkl' % (split, split, parts))
 
-        # prepare reference captions to compute bleu scores later
-        image_ids = {}
-        feature_to_bboxes = {}
-        i = -1
-        for bbox, image_id in zip(annotations['bbox'], annotations['image_id']):
-            if not image_id in image_ids:
-                image_ids[image_id] = 0
-                i += 1
-                feature_to_bboxes[i] = []
-            feature_to_bboxes[i].append(bbox)
-        save_pickle(feature_to_bboxes, './data/data/%s/%s.references.pkl' % (split, split))
-        print "Finished building %s bbox dataset" %split
+                # prepare reference captions to compute bleu scores later
+                image_ids = {}
+                feature_to_bboxes = {}
+                i = -1
+                for bbox, image_id in zip(annotations['bbox'], annotations['image_id']):
+                    if not image_id in image_ids:
+                        image_ids[image_id] = 0
+                        i += 1
+                        feature_to_bboxes[i] = []
+                    feature_to_bboxes[i].append(bbox)
+                save_pickle(feature_to_bboxes, './data/data/%s/%s.references.part%d.pkl' % (split, split, parts))
+                print "Finished building %s bbox dataset part%d" %(split, parts)
 
     is_exit = False
     if is_exit is True:
@@ -315,32 +324,39 @@ def main():
 
         for split in ['train', 'val', 'test']:
             anno_path = './data/data/%s/%s.annotations.pkl' % (split, split)
-            save_path = './data/data/%s/%s.features.hkl' % (split, split)
-            i_path = './data/data/%s/%s.images.hkl' % (split, split)
+            annotation_all = load_pickle(anno_path)
+            num_of_parts = 128
+            n_samples = len(annotation_all)
+            samples_per_parts = int(n_samples / num_of_parts)
 
-            annotations = load_pickle(anno_path)
-            image_path = list(annotations['file_name'].unique())
-            n_examples = len(image_path)
-            # n_examples = (n_examples/200)*10
+            for parts in range(num_of_parts):
+                annotations = annotation_all.iloc[samples_per_parts*parts:samples_per_parts*(parts+1)]
 
-            origin_images = np.ndarray([n_examples, 299, 299, 3], dtype=np.float32)
-            all_feats = np.ndarray([n_examples, WW, HH, DD], dtype=np.float32)
+                save_path = './data/data/%s/%s.features.part%d.hkl' % (split, split, parts)
+                i_path = './data/data/%s/%s.images.part%d.hkl' % (split, split, parts)
 
-            for start, end in zip(range(0, n_examples, batch_size),
-                                  range(batch_size, n_examples + batch_size, batch_size)):
-                image_batch_file = image_path[start:end]
-                image_batch = np.array(map(lambda x: ndimage.imread(x, mode='RGB'), image_batch_file)).astype(
-                    np.float32)
-                feats = sess.run(features, feed_dict={images: image_batch})
-                origin_images[start:end, :] = image_batch
-                all_feats[start:end, :] = feats
-                print ("Processed %d %s features.." % (end, split))
+                image_path = list(annotations['file_name'].unique())
+                n_examples = len(image_path)
+                # n_examples = (n_examples/200)*10
 
-            # use hickle to save huge feature vectors
-            hickle.dump(origin_images, i_path)
-            print ("Saved %s.." % (i_path))
-            hickle.dump(all_feats, save_path)
-            print ("Saved %s.." % (save_path))
+                origin_images = np.ndarray([n_examples, 299, 299, 3], dtype=np.float32)
+                all_feats = np.ndarray([n_examples, WW, HH, DD], dtype=np.float32)
+
+                for start, end in zip(range(0, n_examples, batch_size),
+                                      range(batch_size, n_examples + batch_size, batch_size)):
+                    image_batch_file = image_path[start:end]
+                    image_batch = np.array(map(lambda x: ndimage.imread(x, mode='RGB'), image_batch_file)).astype(
+                        np.float32)
+                    feats = sess.run(features, feed_dict={images: image_batch})
+                    origin_images[start:end, :] = image_batch
+                    all_feats[start:end, :] = feats
+                    print ("Processed %d %s features.." % (end, split))
+
+                # use hickle to save huge feature vectors
+                hickle.dump(origin_images, i_path)
+                print ("Saved %s.." % (i_path))
+                hickle.dump(all_feats, save_path)
+                print ("Saved %s.." % (save_path))
 
 
 

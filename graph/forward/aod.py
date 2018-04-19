@@ -487,6 +487,21 @@ class AOD(IForward):
             a = -tf.square(sample - mean) / (2.0 * tf.square(self.loc_sd))
             return Z * tf.exp(a)
 
+        def cum_discount_rewards(rewards, num_step, df=0.99):
+            cum_prod_reward_list = []
+            for s in range(num_ste):
+                dfs = np.zeros(num_step)
+                dfs[s:-1] = df
+                dfs[s] = 1.0
+                dfs = np.cumprod(dfs)
+                ipdb.set_trace()
+                dfs = tf.convert_to_tensor(dfs, dtype=tf.float32)
+                cum_prod_reward = tf.reduce_sum(rewards*dfs, axis=1)
+                cum_prod_reward_list.append(cum_prod_reward)
+            return tf.stack(cum_prod_reward_list)
+
+
+
         target_class_one_hot = tf.one_hot(target_class_input, num_class_input)
         predict_class_prob = tf.nn.softmax(predict_class_input)
         predict_target_prob = tf.reduce_sum(predict_class_prob*target_class_one_hot, axis=2)
@@ -506,20 +521,22 @@ class AOD(IForward):
 
         invalid_mean_loc = self._invalid_bbox(mean_location_input)
         invalid_sample_loc = self._invalid_bbox(sample_location_origin)
-        invalid_area = self._invalid_area(mean_location_input)
+        invalid_mean_area = self._invalid_area(mean_location_input)
         invalid_mean_loc =_debug_func(invalid_mean_loc ,'policy_invalid_mean_loc',break_point=False, to_file=True)
         invalid_sample_loc =_debug_func(invalid_sample_loc ,'policy_invalid_sample_loc',break_point=False, to_file=True)
 
         # rewards
         rewards_scale = 1e1
         invalid_scale = 1e0
+        invalid_area_scale = 1e-1
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
         # rewards = (tf.squeeze(iou,[1,2]) * predict_target_prob)*rewards_scale
         # rewards = (tf.reduce_sum(iou,[2]))*rewards_scale - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         rewards = rewards_scale*tf.squeeze(iou,[2])*predict_target_prob
         rewards =_debug_func(rewards ,'policy_rewards_step',break_point=False, to_file=True)
         cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
-        cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_mean_loc),[2]))
+        # cum_rewards = cum_discount_rewards(rewards, self.T , df=0.99):
+        cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_mean_loc),[2])) - invalid_mean_area*invalid_area_scale
         # cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         cum_rewards =_debug_func(cum_rewards,'policy_cum_rewards',break_point=False, to_file=True)
 

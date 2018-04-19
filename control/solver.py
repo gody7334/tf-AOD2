@@ -4,14 +4,13 @@ import skimage.transform
 import numpy as np
 import time
 from time import sleep
-import os
+import os, shutil, os.path
 import cPickle as pickle
 from scipy import ndimage
-from utils import *
 import ipdb
 from pprint import pprint as pp
-
 from utils.config import global_config
+from core.load_dataset import *
 
 class Solver(object):
     def __init__(self, model, optimizer, data, val_data, **kwargs):
@@ -69,28 +68,19 @@ class Solver(object):
             os.makedirs(self.log_path)
 
     def train(self, chunk=0):
+        gc = global_config.global_config
         global_config.global_config.tf_mode = 'train'
-        # train/val dataset
-        n_examples = self.data['bboxes'].shape[0]
-        n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
+
         features = self.data['features']
         images = self.data['images']
         bboxes = self.data['bboxes']
         classes = self.data['classes']
         image_idxs = self.data['image_idxs']
 
-        area_upper_bound = 1
-        area_lower_bound = 0.3
-        bboxes_area = bboxes[:,:,2]*bboxes[:,:,3]
-        bboxes_area_zero_mask = bboxes_area == 0
-        bboxes_area_threshlod_mask = (bboxes_area > area_lower_bound) * (bboxes_area <= area_upper_bound)
-        bboxes_mask = np.prod(bboxes_area_threshlod_mask + bboxes_area_zero_mask, axis=1)
-        bboxes_index = np.argwhere(bboxes_mask==1)
-
-        bboxes = bboxes[bboxes_index]
-        classes = classes[bboxes_index]
-        image_idxs = image_idxs[bboxes_index]
-        n_examples = bboxes_index.shape[0]
+        # train/val dataset
+        n_examples = self.data['bboxes'].shape[0]
+        # n_examples = bboxes_index.shape[0]
+        n_iters_per_epoch = int(np.floor(float(n_examples) / self.batch_size))
 
         # val_features = self.val_data['features']
         # val_iamges = self.val_data['images']
@@ -145,9 +135,7 @@ class Solver(object):
             curr_loss = 0
             start_t = time.time()
 
-            e = 0
-            step = 0
-            for e in range(self.n_epochs):
+            for gc.train_epoch_count in range(self.n_epochs):
                 rand_idxs = np.random.permutation(n_examples)
                 bboxes = bboxes[rand_idxs]
                 classes = classes[rand_idxs]
@@ -159,16 +147,17 @@ class Solver(object):
                     image_idxs_batch = image_idxs[i * self.batch_size:(i + 1) * self.batch_size]
                     features_batch = features[image_idxs_batch]
                     images_batch = images[image_idxs_batch]
-                    feed_dict = {self.model.images: images_batch,
-                                 self.model.features: features_batch,
-                                 self.model.bbox_seqs: bboxes_batch,
-                                 self.model.class_seqs: classes_batch}
-                    _, l = sess.run([self.optimizer.train_op, self.model.batch_loss], feed_dict)
-                    curr_loss += l
+                    for r in range(gc.replay_times):
+                        feed_dict = {self.model.images: images_batch,
+                                     self.model.features: features_batch,
+                                     self.model.bbox_seqs: bboxes_batch,
+                                     self.model.class_seqs: classes_batch}
+                        _, l = sess.run([self.optimizer.train_op, self.model.batch_loss], feed_dict)
+                        curr_loss += l
 
                     # write summary for tensorboard visualization
-                    step += 1
-                    if step % global_config.global_config.log_every_n_steps == 0:
+                    gc.train_step_count += 1
+                    if gc.train_step_count % global_config.global_config.log_every_n_steps == 0:
                         summary = sess.run(summary_op, feed_dict)
                         summary_writer.add_summary(
                             summary, tf.train.global_step(sess, self.model.global_step))
@@ -212,8 +201,22 @@ class Solver(object):
                     # write_bleu(scores=scores, path=self.model_path, epoch=e + chunk * 10)
 
                 # save model's parameters
-                e+=1
-                if (e + 1) % self.save_every == 0:
+                gc.train_epoch_count +=1
+                if (gc.train_epoch_count + 1) % self.save_every == 0:
+                    def clean_folder(folder_dir):
+                        for the_file in os.listdir(folder_dir):
+                            file_path = os.path.join(folder_dir, the_file)
+                            rm_file(file_path)
+
+                    def rm_file(file_path):
+                        try:
+                            if os.path.isfile(file_path):
+                                os.unlink(file_path)
+                            #elif os.path.isdir(file_path): shutil.rmtree(file_path)
+                        except Exception as e:
+                            print(e)
+
+                    clean_folder(self.model_path)
                     saver.save(sess,
                             os.path.join(self.model_path, 'model'),
                             tf.train.global_step(sess, self.model.global_step))
@@ -230,7 +233,7 @@ class Solver(object):
 
         config = tf.ConfigProto(allow_soft_placement=True)
         # config.gpu_options.per_process_gpu_memory_fraction=0.9
-        # config.gpu_options.allow_growth = True
+        config.gpu_options.allow_growth = True
 
         with tf.Session(config=config) as sess:
             tf.global_variables_initializer().run()
@@ -286,9 +289,10 @@ class Solver(object):
             l = sess.run(self.model.batch_loss, feed_dict)
             curr_loss += l
 
-            summary = sess.run(summary_op, feed_dict)
-            summary_writer.add_summary(
-                summary, tf.train.global_step(sess, self.model.global_step))
+            if i % (n_iters_per_epoch/2) == 0:
+                summary = sess.run(summary_op, feed_dict)
+                summary_writer.add_summary(
+                    summary, tf.train.global_step(sess, self.model.global_step))
 
             print "Previous epoch loss: ", prev_loss
             print "Current epoch loss: ", curr_loss
