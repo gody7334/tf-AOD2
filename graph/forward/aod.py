@@ -488,17 +488,18 @@ class AOD(IForward):
             return Z * tf.exp(a)
 
         def cum_discount_rewards(rewards, num_step, df=0.99):
+            from scipy.ndimage.interpolation import shift
             cum_prod_reward_list = []
-            for s in range(num_ste):
+            for s in range(num_step):
                 dfs = np.zeros(num_step)
-                dfs[s:-1] = df
-                dfs[s] = 1.0
+                dfs[:] = df
+                dfs[0] = 1.0
                 dfs = np.cumprod(dfs)
-                ipdb.set_trace()
+                dfs = shift(dfs, s, cval=0.0)
                 dfs = tf.convert_to_tensor(dfs, dtype=tf.float32)
                 cum_prod_reward = tf.reduce_sum(rewards*dfs, axis=1)
                 cum_prod_reward_list.append(cum_prod_reward)
-            return tf.stack(cum_prod_reward_list)
+            return tf.transpose(tf.stack(cum_prod_reward_list),(1,0))
 
 
 
@@ -534,8 +535,8 @@ class AOD(IForward):
         # rewards = (tf.reduce_sum(iou,[2]))*rewards_scale - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         rewards = rewards_scale*tf.squeeze(iou,[2])*predict_target_prob
         rewards =_debug_func(rewards ,'policy_rewards_step',break_point=False, to_file=True)
-        cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
-        # cum_rewards = cum_discount_rewards(rewards, self.T , df=0.99):
+        # cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
+        cum_rewards = cum_discount_rewards(rewards, self.T , df=0.5)
         cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_mean_loc),[2])) - invalid_mean_area*invalid_area_scale
         # cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         cum_rewards =_debug_func(cum_rewards,'policy_cum_rewards',break_point=False, to_file=True)
