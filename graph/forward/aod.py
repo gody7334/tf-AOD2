@@ -74,7 +74,7 @@ class AOD(IForward):
         self.targets = None
         self.weights = None
 
-        self.df = 0.99
+        self.df = 0.5
 
         if self.mode == 'train':
             self.loc_sd = 0.15

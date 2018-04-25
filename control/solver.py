@@ -289,6 +289,9 @@ class Solver(object):
             l = sess.run(self.model.batch_loss, feed_dict)
             curr_loss += l
 
+            if n_iters_per_epoch/2 == 0:
+                break
+
             if i % (n_iters_per_epoch/2) == 0:
                 summary = sess.run(summary_op, feed_dict)
                 summary_writer.add_summary(

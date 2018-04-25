@@ -106,7 +106,7 @@ class Global_Config(object):
 
         # filter area
         self.area_upper_bound = 1
-        self.area_lower_bound = 0.000000001
+        self.area_lower_bound = 0.2
 
         #log directory.
         self.log_dir = self.tf_log_dir

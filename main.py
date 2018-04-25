@@ -25,8 +25,9 @@ def main():
             if os.path.isfile(os.path.join('./data/data/train', '%s.file.names.part%d.pkl' % ('train',part))):
                 solver.data = load_coco_data(data_path='./data/data', split='train', if_train=True, part=part)
                 solver.val_data = load_coco_data(data_path='./data/data', split='val', if_train=False, part=part)
-                solver.train()
-                solver.val()
+                if ((len(solver.data) > 0) and (len(solver.val_data))):
+                    solver.train()
+                    solver.val()
 
     elif global_config.global_config.mode == 'val':
         data = None
