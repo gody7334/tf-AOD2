@@ -281,12 +281,12 @@ class AOD(IForward):
             w_fc7 = tf.get_variable('w_fc7', [self.H*2, self.H*2], initializer=self.weight_initializer)
             b_fc7 = tf.get_variable('b_fc7', [self.H*2], initializer=self.const_initializer)
 
-            w_bbox = tf.get_variable('w_bbox', [self.H*2,(self.config.num_classes+1)*4], initializer=self.weight_initializer)
-            b_bbox = tf.get_variable('b_bbox', [(self.config.num_classes+1)*4], initializer=self.point5_initializer)
+            w_bbox = tf.get_variable('w_bbox', [self.H*2,(self.config.num_classes)*4], initializer=self.weight_initializer)
+            b_bbox = tf.get_variable('b_bbox', [(self.config.num_classes)*4], initializer=self.point5_initializer)
 
             # number of class should need to add background
-            w_class = tf.get_variable('w_class', [self.H*2, self.config.num_classes+1], initializer=self.weight_initializer)
-            b_class = tf.get_variable('b_class', [self.config.num_classes+1], initializer=self.const_initializer)
+            w_class = tf.get_variable('w_class', [self.H*2, self.config.num_classes], initializer=self.weight_initializer)
+            b_class = tf.get_variable('b_class', [self.config.num_classes], initializer=self.const_initializer)
 
             # bboxes (xmid, ymid, w, h), to prevent inverse bbox
 
@@ -300,7 +300,7 @@ class AOD(IForward):
 
             # do not clip the boundary, let optimisation to do the job
             bboxes = tf.matmul(fc7, w_bbox) + b_bbox
-            bboxes = tf.reshape(bboxes,[self.NN, self.config.num_classes+1,4])
+            bboxes = tf.reshape(bboxes,[self.NN, self.config.num_classes,4])
 
             # get predict bbox with max class prediction
             max_class_index = tf.expand_dims(tf.argmax(class_logits,axis=1),1)
@@ -401,7 +401,7 @@ class AOD(IForward):
 
         # get max_iou index
         N = self.NN
-        num_class = self.config.num_classes
+        num_class = self.config.num_classes-1
         n_idx = tf.expand_dims(tf.cast(tf.range(N),tf.int64),1)
         # argmax_ious = tf.expand_dims(argmax_ious,1)
         n_idx = tf.concat([n_idx,argmax_ious],1)
@@ -427,7 +427,7 @@ class AOD(IForward):
         losses (N), batches of softmax loss between logit and label
         '''
         # mask = tf.stop_gradient(tf.less_equal(label_input,91))
-        mask = tf.less_equal(label_input,91)
+        mask = tf.less_equal(label_input,self.config.num_classes-1)
         label_input = tf.multiply(label_input,tf.cast(mask, tf.int64))
         losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_input, logits=logit_input)
         return losses
@@ -573,8 +573,6 @@ class AOD(IForward):
 
         # initial lstm c,h with features
         (c,h) = self._get_initial_lstm(features)
-        # h = tf.zeros([self.NN,self.H])
-        # c = tf.zeros([self.NN,self.H])
 
         lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=self.H)
 
@@ -594,8 +592,7 @@ class AOD(IForward):
                 _, (c, h) = lstm_cell(inputs=self.glimpses_project, state=[c, h])
 
             h =_debug_func(h ,'buildmodel_h',break_point=False, to_file=True)
-            self._decode_lstm_bbox_class(h,reuse=(t!=0))
-            # self._decode_lstm_bbox_class(self.glimpses,reuse=(t!=0))
+            self._decode_lstm_bbox_class(self.glimpses_project, reuse=(t!=0))
 
         # self.region_proposals = tf.transpose(tf.stack(region_proposals_list),(1,0))
 
@@ -666,7 +663,7 @@ class AOD(IForward):
         sample_location_origin = tf.transpose(tf.stack(self.sample_locs_origin_list),(1,0,2))
         baseline = tf.transpose(tf.stack(self.baselines_list),(1,0,2))
 
-        policy_losses = self.get_policy_gradient_loss(self.config.num_classes+1,
+        policy_losses = self.get_policy_gradient_loss(self.config.num_classes,
                             target_classes,
                             target_bboxes,
                             predict_class_logits,
@@ -684,7 +681,7 @@ class AOD(IForward):
         policy_loss = tf.reduce_mean(policy_losses)
         reward = tf.reduce_sum(self.rewards)
 
-        batch_loss = class_loss*0.1 + bbox_loss*10.0 + policy_loss*0.01
+        batch_loss = class_loss*1.0 + bbox_loss*1.0 + policy_loss*0.1
 
         batch_loss = self._l2_regularization(batch_loss)
 

@@ -90,7 +90,7 @@ class Global_Config(object):
         self.replay_times = 5
 
         # global varialbe to control summary write
-        self.log_every_n_steps = 500
+        self.log_every_n_steps = 200
         self.train_step_count = 0
         self.train_epoch_count = 0
         self.val_step_count = 0
@@ -106,7 +106,7 @@ class Global_Config(object):
 
         # filter area
         self.area_upper_bound = 1
-        self.area_lower_bound = 0.2
+        self.area_lower_bound = 0.1
 
         #log directory.
         self.log_dir = self.tf_log_dir

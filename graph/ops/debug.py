@@ -36,7 +36,7 @@ def _debug_func(tensor, name="", print_tf=False, print_op=False, break_point=Fal
 
 def debug_func(tf, tf_name, tf_op, tf_type, tf_device, print_tf, print_op, break_point, name, to_file):
   global counter
-  if to_file and counter%50==0:
+  if to_file and counter%200==0:
     np.set_printoptions(threshold=np.nan)
     f = open(global_config.global_config.tf_log_dir + name + '_log.txt','a')
     pprint.pprint(name, f)
