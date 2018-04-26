@@ -19,9 +19,11 @@ from utils.config import global_config
 counter = 0
 
 def _debug_func(tensor, name="", print_tf=False, print_op=False, break_point=False, to_file=False):
-  do_debug = global_config.global_config.is_tf_log
+  gc = global_config.global_config
+  global counter
+  counter = gc.train_step_count
 
-  if do_debug:
+  if gc.is_tf_log:
     t = tensor
     debug_op = tf.py_func(debug_func, [t, t.name, str(t.op), str(t.dtype), t.device, print_tf, print_op, break_point, name, to_file], [tf.bool])
 
@@ -34,7 +36,6 @@ def _debug_func(tensor, name="", print_tf=False, print_op=False, break_point=Fal
 
 def debug_func(tf, tf_name, tf_op, tf_type, tf_device, print_tf, print_op, break_point, name, to_file):
   global counter
-  counter += 1
   if to_file and counter%50==0:
     np.set_printoptions(threshold=np.nan)
     f = open(global_config.global_config.tf_log_dir + name + '_log.txt','a')

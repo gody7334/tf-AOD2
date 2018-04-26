@@ -507,9 +507,9 @@ class AOD(IForward):
 
         target_class_one_hot = tf.one_hot(target_class_input, num_class_input)
         predict_class_prob = tf.nn.softmax(predict_class_input)
-        predict_target_prob = tf.reduce_sum(predict_class_prob*target_class_one_hot, axis=2)
-        target_class_one_hot =_debug_func(target_class_one_hot,'policy_target_class_one_hot',break_point=False, to_file=True)
         predict_class_prob =_debug_func(predict_class_prob ,'policy_predict_class_prob',break_point=False, to_file=True)
+        target_class_one_hot =_debug_func(target_class_one_hot,'policy_target_class_one_hot',break_point=False, to_file=True)
+        predict_target_prob = tf.reduce_sum(predict_class_prob*target_class_one_hot, axis=2)
         predict_target_prob =_debug_func(predict_target_prob ,'policy_predict_target_prob',break_point=False, to_file=True)
 
         target_bbox_input =_debug_func(target_bbox_input ,'policy_target_bbox_input',break_point=False, to_file=True)
@@ -519,7 +519,7 @@ class AOD(IForward):
         baseline_iou = tf.squeeze(baseline_input,[2])
         baseline_iou_stop_gradient = tf.stop_gradient(baseline_iou)
         # baseline_iou = tf.reduce_mean(tf.fill(iou.get_shape(), 0.2),[2])
-        iou =_debug_func(iou ,'policy_iou',break_point=False, to_file=True)
+        iou =_debug_func(tf.squeeze(iou,[2]) ,'policy_iou',break_point=False, to_file=True)
         baseline_iou =_debug_func(baseline_iou ,'policy_baseline_iou',break_point=False, to_file=True)
 
         invalid_mean_loc = self._invalid_bbox(mean_location_input)
@@ -529,13 +529,13 @@ class AOD(IForward):
         invalid_sample_loc =_debug_func(invalid_sample_loc ,'policy_invalid_sample_loc',break_point=False, to_file=True)
 
         # rewards
-        rewards_scale = 1e1
+        rewards_scale = 1e2
         invalid_scale = 1e0
         invalid_area_scale = 1e-1
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
         # rewards = (tf.squeeze(iou,[1,2]) * predict_target_prob)*rewards_scale
         # rewards = (tf.reduce_sum(iou,[2]))*rewards_scale - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
-        rewards = rewards_scale*tf.squeeze(iou,[2])*predict_target_prob
+        rewards = rewards_scale * iou * predict_target_prob
         rewards =_debug_func(rewards ,'policy_rewards_step',break_point=False, to_file=True)
         # cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
         cum_rewards = cum_discount_rewards(rewards, self.T , df=self.df)
