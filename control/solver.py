@@ -290,6 +290,12 @@ class Solver(object):
             curr_loss += l
 
             if n_iters_per_epoch/2 == 0:
+                summary = sess.run(summary_op, feed_dict)
+                summary_writer.add_summary(
+                summary, tf.train.global_step(sess, self.model.global_step))
+                print "Previous epoch loss: ", prev_loss
+                print "Current epoch loss: ", curr_loss
+                print "Elapsed time: ", time.time() - start_t
                 break
 
             if i % (n_iters_per_epoch/2) == 0:

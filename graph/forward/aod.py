@@ -77,7 +77,7 @@ class AOD(IForward):
         self.df = 0.5
 
         if self.mode == 'train':
-            self.loc_sd = 0.15
+            self.loc_sd = 0.1
         else:
             self.loc_sd = 1e-10
 
@@ -91,6 +91,7 @@ class AOD(IForward):
         self.bboxes_list = [] # predict bbox
         self.class_logits_list = [] # predict class
         self.rewards = None
+        self.invalid_bbox_list = []
 
         self.region_proposals = None
         self.glimpses = None
@@ -275,32 +276,35 @@ class AOD(IForward):
         '''
         with tf.variable_scope('decode_bbox_class', reuse=reuse):
 
-            # w_fc6 = tf.get_variable('w_fc6', [self.glimpse_w*self.glimpse_h*self.DD, self.H*2], initializer=self.weight_initializer)
-            w_fc6 = tf.get_variable('w_fc6', [self.H, self.H*2], initializer=self.weight_initializer)
-            b_fc6 = tf.get_variable('b_fc6', [self.H*2], initializer=self.const_initializer)
-            w_fc7 = tf.get_variable('w_fc7', [self.H*2, self.H*2], initializer=self.weight_initializer)
-            b_fc7 = tf.get_variable('b_fc7', [self.H*2], initializer=self.const_initializer)
+            w_fc6_bbox = tf.get_variable('w_fc6_bbox', [self.H, self.H*2], initializer=self.weight_initializer)
+            b_fc6_bbox = tf.get_variable('b_fc6_bbox', [self.H*2], initializer=self.const_initializer)
+            w_fc7_bbox = tf.get_variable('w_fc7_bbox', [self.H*2, self.H*2], initializer=self.weight_initializer)
+            b_fc7_bbox = tf.get_variable('b_fc7_bbox', [self.H*2], initializer=self.const_initializer)
+
+            w_fc6_class = tf.get_variable('w_fc6_class', [self.H, self.H*2], initializer=self.weight_initializer)
+            b_fc6_class = tf.get_variable('b_fc6_class', [self.H*2], initializer=self.const_initializer)
+            w_fc7_class = tf.get_variable('w_fc7_class', [self.H*2, self.H*2], initializer=self.weight_initializer)
+            b_fc7_class = tf.get_variable('b_fc7_class', [self.H*2], initializer=self.const_initializer)
 
             w_bbox = tf.get_variable('w_bbox', [self.H*2,(self.config.num_classes)*4], initializer=self.weight_initializer)
             b_bbox = tf.get_variable('b_bbox', [(self.config.num_classes)*4], initializer=self.point5_initializer)
 
-            # number of class should need to add background
             w_class = tf.get_variable('w_class', [self.H*2, self.config.num_classes], initializer=self.weight_initializer)
             b_class = tf.get_variable('b_class', [self.config.num_classes], initializer=self.const_initializer)
 
-            # bboxes (xmid, ymid, w, h), to prevent inverse bbox
+            fc6_bbox = tf.nn.tanh(tf.matmul(h, w_fc6_bbox) + b_fc6_bbox)
+            fc7_bbox = tf.nn.tanh(tf.matmul(fc6_bbox, w_fc7_bbox) + b_fc7_bbox)
 
-            # h = self._batch_norm(h, mode='train', name='bn_fc')
-            # fc6 = tf.nn.tanh(tf.matmul(tf.reshape(h,[self.NN,-1]), w_fc6) + b_fc6)
-            fc6 = tf.nn.tanh(tf.matmul(h, w_fc6) + b_fc6)
-            fc7 = tf.nn.tanh(tf.matmul(fc6, w_fc7) + b_fc7)
+            fc6_class = tf.nn.tanh(tf.matmul(h, w_fc6_class) + b_fc6_class)
+            fc7_class = tf.nn.tanh(tf.matmul(fc6_class, w_fc7_class) + b_fc7_class)
 
             # here only unnormalize log probabilities (logits, score) for each class, need softmax & argmax to find the class
-            class_logits = tf.matmul(fc7, w_class) + b_class
+            class_logits = tf.matmul(fc7_class, w_class) + b_class
 
             # do not clip the boundary, let optimisation to do the job
-            bboxes = tf.matmul(fc7, w_bbox) + b_bbox
+            bboxes = tf.matmul(fc7_bbox, w_bbox) + b_bbox
             bboxes = tf.reshape(bboxes,[self.NN, self.config.num_classes,4])
+            self.invalid_bbox_list.append(self._invalid_bbox(bboxes))
 
             # get predict bbox with max class prediction
             max_class_index = tf.expand_dims(tf.argmax(class_logits,axis=1),1)
@@ -401,13 +405,13 @@ class AOD(IForward):
 
         # get max_iou index
         N = self.NN
-        num_class = self.config.num_classes-1
+        background_class = self.config.num_classes-1
         n_idx = tf.expand_dims(tf.cast(tf.range(N),tf.int64),1)
         # argmax_ious = tf.expand_dims(argmax_ious,1)
         n_idx = tf.concat([n_idx,argmax_ious],1)
 
         # get max_iou class, bbox
-        classes = tf.gather_nd(class_input, n_idx)*tf.squeeze(obj_mask) + tf.squeeze(back_mask)*num_class
+        classes = tf.gather_nd(class_input, n_idx)*tf.squeeze(obj_mask) + tf.squeeze(back_mask)*background_class
         bboxes = tf.gather_nd(bbox_input, n_idx)*tf.cast(tf.expand_dims(tf.squeeze(obj_mask),1),tf.float32)
         argmax_ious = tf.squeeze(argmax_ious)
 
@@ -427,9 +431,14 @@ class AOD(IForward):
         losses (N), batches of softmax loss between logit and label
         '''
         # mask = tf.stop_gradient(tf.less_equal(label_input,91))
-        mask = tf.less_equal(label_input,self.config.num_classes-1)
-        label_input = tf.multiply(label_input,tf.cast(mask, tf.int64))
+        # Down sample background class by random filtering out background loss
+        bg_class_mask = tf.cast(tf.equal(label_input,self.config.num_classes-1),tf.int64)
+        down_sample_mask = tf.random_uniform(bg_class_mask.get_shape(), minval=0, maxval=100, dtype=tf.int64)
+        down_sample_mask = tf.cast(tf.greater(down_sample_mask, 95),tf.int64)
+        bg_class_mask = tf.cast(bg_class_mask * down_sample_mask, tf.float32)
+
         losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_input, logits=logit_input)
+        losses = losses * bg_class_mask
         return losses
 
     def get_bbox_iou_loss(self, predict_bbox_input, target_bbox_input):
@@ -524,14 +533,14 @@ class AOD(IForward):
 
         invalid_mean_loc = self._invalid_bbox(mean_location_input)
         invalid_sample_loc = self._invalid_bbox(sample_location_origin)
-        invalid_mean_area = self._invalid_area(mean_location_input)
+        invalid_sample_area = self._invalid_area(sample_location_origin)
         invalid_mean_loc =_debug_func(invalid_mean_loc ,'policy_invalid_mean_loc',break_point=False, to_file=True)
         invalid_sample_loc =_debug_func(invalid_sample_loc ,'policy_invalid_sample_loc',break_point=False, to_file=True)
 
         # rewards
-        rewards_scale = 1e2
+        rewards_scale = 1e1
         invalid_scale = 1e0
-        invalid_area_scale = 1e-1
+        invalid_area_scale = 1e0
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
         # rewards = (tf.squeeze(iou,[1,2]) * predict_target_prob)*rewards_scale
         # rewards = (tf.reduce_sum(iou,[2]))*rewards_scale - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
@@ -539,7 +548,7 @@ class AOD(IForward):
         rewards =_debug_func(rewards ,'policy_rewards_step',break_point=False, to_file=True)
         # cum_rewards = tf.cumsum(rewards,axis=1,reverse=True)
         cum_rewards = cum_discount_rewards(rewards, self.T , df=self.df)
-        cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_mean_loc),[2])) - invalid_mean_area*invalid_area_scale
+        cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2])) - invalid_sample_area*invalid_area_scale
         # cum_rewards = cum_rewards - invalid_scale*(tf.reduce_mean((invalid_sample_loc),[2]) + tf.reduce_mean((invalid_mean_loc),[2]))
         cum_rewards =_debug_func(cum_rewards,'policy_cum_rewards',break_point=False, to_file=True)
 
@@ -639,14 +648,11 @@ class AOD(IForward):
 
             class_losses = self.get_class_softmax_loss(predict_class_logit, target_class)
 
-            invalid_bbox = self._invalid_bbox(predict_bbox_full)
-            invalid_bbox = invalid_bbox + self._invalid_bbox(predict_bbox)
-            # invalid_bbox = tf.fill(invalid_bbox.get_shape(),0.0)
             mask = tf.cast(tf.greater(tf.reduce_sum(target_bbox,[1]),0),tf.float32)
             # bbox_losses = self.get_bbox_iou_loss(predict_bbox_full, target_bbox)
             # bbox_losses = (tf.reduce_sum(invalid_bbox*0.01,[1]) + bbox_losses)*mask
             bbox_losses = self._smooth_l1_loss(self._convert_coordinate(predict_bbox_full, "frcnn","mscoco",dim=2),target_bbox)
-            bbox_losses = tf.reduce_sum(invalid_bbox*0.01 + bbox_losses, [1])*mask
+            bbox_losses = tf.reduce_sum(bbox_losses, [1])*mask
             # bbox_losses = tf.reduce_sum(self._smooth_l1_loss(
                 # self._convert_coordinate(predict_bbox_full, "frcnn","mscoco",dim=2)
                 # ,target_bbox),[1])*mask
@@ -675,13 +681,16 @@ class AOD(IForward):
 
         class_losses = tf.transpose(tf.stack(class_losses_list),(1,0))
         bbox_losses = tf.transpose(tf.stack(bbox_losses_list),(1,0))
+        total_invalid_bbox = tf.transpose(tf.stack(self.invalid_bbox_list),(1,0,2,3))
+
 
         class_loss = tf.reduce_mean(class_losses)
         bbox_loss = tf.reduce_mean(bbox_losses)
         policy_loss = tf.reduce_mean(policy_losses)
+        total_invalid_bbox = tf.reduce_mean(tf.reduce_sum(total_invalid_bbox,[1,2,3]))
         reward = tf.reduce_sum(self.rewards)
 
-        batch_loss = class_loss*1.0 + bbox_loss*1.0 + policy_loss*0.1
+        batch_loss = class_loss*1.0 + bbox_loss*1.0 + policy_loss*1.0 + total_invalid_bbox*1.0
 
         batch_loss = self._l2_regularization(batch_loss)
 
