@@ -220,15 +220,11 @@ class AOD(IForward):
                     last_sample_loc = self.sampled_locs_list[t-1]
                 mean_loc = tf.matmul(h,mean_w)+mean_b + last_sample_loc
 
-            # add noise - sample from guassion distribution
-            # as agent to decide the mean_loc vs sample_los is good or bad
-            # ee = tf.cast(tf.greater(tf.random_uniform(mean_loc.get_shape(), 0, 1.0),self.ee_ratio),tf.float32)+1
-            sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
-            # sample_loc_origin = mean_loc + tf.random_uniform(mean_loc.get_shape(), -0.5, 0.5)*ee
-
-            # fixed_wh = 0.8
-            # mean_loc = tf.concat([mean_loc, tf.fill(mean_loc.get_shape(), fixed_wh)], 1)
-            # sample_loc_origin = tf.concat([sample_loc_origin , tf.fill(sample_loc_origin.get_shape(), fixed_wh)], 1)
+            random_target_loc = tf.squeeze(tf.slice(tf.transpose(tf.random_shuffle(tf.transpose(self.bbox_seqs,(1,0,2))),(1,0,2)), [0,0,0],[-1,1,-1]))
+            random_target_loc.set_shape([self.NN, self.B])
+            mask = tf.cast(tf.equal(random_target_loc,0),tf.float32)
+            # sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
+            sample_loc_origin = mean_loc*(mask) + random_target_loc*(1-mask) + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
 
             self.mean_locs_list.append(mean_loc)
             self.sample_locs_origin_list.append(sample_loc_origin)
