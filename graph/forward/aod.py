@@ -221,10 +221,11 @@ class AOD(IForward):
                 mean_loc = tf.matmul(h,mean_w)+mean_b + last_sample_loc
 
             random_target_loc = tf.squeeze(tf.slice(tf.transpose(tf.random_shuffle(tf.transpose(self.bbox_seqs,(1,0,2))),(1,0,2)), [0,0,0],[-1,1,-1]))
+            random_target_loc = self._convert_coordinate(random_target_loc, "mscoco", "frcnn",dim=2)
             random_target_loc.set_shape([self.NN, self.B])
             mask = tf.cast(tf.equal(random_target_loc,0),tf.float32)
             # sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
-            sample_loc_origin = mean_loc*(mask) + random_target_loc*(1-mask) + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
+            sample_loc_origin = (mean_loc+tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd))*(mask) + (random_target_loc+ tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd*self.loc_sd))*(1-mask)
 
             self.mean_locs_list.append(mean_loc)
             self.sample_locs_origin_list.append(sample_loc_origin)
