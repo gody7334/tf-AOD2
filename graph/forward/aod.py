@@ -210,7 +210,7 @@ class AOD(IForward):
             # eye_center to the previous sample_loc:
             # high bias, bias to previous stage ,loc
             # low variance, limit to previous stage, loc
-            eye_center = True
+            eye_center = False
             if eye_center == False:
                 mean_loc = tf.matmul(h,mean_w)+mean_b
             else:
