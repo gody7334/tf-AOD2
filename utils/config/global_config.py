@@ -86,11 +86,14 @@ class Global_Config(object):
 
         # train
         self.train_n_epoch = 50
+
         # replay times
         self.replay_times = 5
 
         # global varialbe to control summary write
         self.log_every_n_steps = 200
+        # self.log_every_n_steps = 1
+        self.log_to_file_every_n_steps = 50
         self.train_step_count = 0
         self.train_epoch_count = 0
         self.val_step_count = 0
@@ -148,6 +151,7 @@ class Global_Config(object):
 
         # Target length (max time steps)
         self.target_length = 20
+        self.num_time_step = 21
 
         """Sets the default training hyperparameters."""
         # Number of examples per epoch of training data.

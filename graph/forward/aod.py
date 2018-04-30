@@ -54,7 +54,7 @@ class AOD(IForward):
         self.D = None # depend on desired inception layer
         self.M = 512 # word embedded
         self.H = self.config.num_lstm_units # hidden stage
-        self.T = 21 # Time step size of LSTM (how many predicting bboxes in a image)
+        self.T = self.config.num_time_step # Time step size of LSTM (how many predicting bboxes in a image)
         self.B = 4 # bbox dimension
 
         self.NN = self.config.batch_size # batch size
@@ -430,12 +430,14 @@ class AOD(IForward):
         # mask = tf.stop_gradient(tf.less_equal(label_input,91))
         # Down sample background class by random filtering out background loss
         bg_class_mask = tf.cast(tf.equal(label_input,self.config.num_classes-1),tf.int64)
+        obj_class_mask = tf.cast(tf.not_equal(label_input, self.config.num_classes-1), tf.float32)
+
         down_sample_mask = tf.random_uniform(bg_class_mask.get_shape(), minval=0, maxval=100, dtype=tf.int64)
-        down_sample_mask = tf.cast(tf.greater(down_sample_mask, 95),tf.int64)
+        down_sample_mask = tf.cast(tf.greater(down_sample_mask, 98),tf.int64)
         bg_class_mask = tf.cast(bg_class_mask * down_sample_mask, tf.float32)
 
         losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_input, logits=logit_input)
-        losses = losses * bg_class_mask
+        losses = losses * bg_class_mask + losses * obj_class_mask
         return losses
 
     def get_bbox_iou_loss(self, predict_bbox_input, target_bbox_input):
@@ -509,7 +511,8 @@ class AOD(IForward):
                 cum_prod_reward_list.append(cum_prod_reward)
             return tf.transpose(tf.stack(cum_prod_reward_list),(1,0))
 
-
+        predict_class_input = tf.stop_gradient(predict_class_input)
+        predict_bbox_input = tf.stop_gradient(predict_bbox_input)
 
         target_class_one_hot = tf.one_hot(target_class_input, num_class_input)
         predict_class_prob = tf.nn.softmax(predict_class_input)
@@ -535,7 +538,7 @@ class AOD(IForward):
         invalid_sample_loc =_debug_func(invalid_sample_loc ,'policy_invalid_sample_loc',break_point=False, to_file=True)
 
         # rewards
-        rewards_scale = 1e1
+        rewards_scale = 1e0
         invalid_scale = 1e0
         invalid_area_scale = 1e0
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
