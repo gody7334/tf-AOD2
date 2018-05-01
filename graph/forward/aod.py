@@ -576,7 +576,7 @@ class AOD(IForward):
         baseline_estimator_loss = tf.reduce_sum(tf.square(cum_rewards - baseline_iou), 1)
 
         tf.summary.scalar("losses/policy_gradient", tf.reduce_mean(policy_gradient))
-        tf.summary.scalar("losses/baseline_estimator_loss", tf.reduce_mane(baseline_estimator_loss))
+        tf.summary.scalar("losses/baseline_estimator_loss", tf.reduce_mean(baseline_estimator_loss))
 
         J = policy_gradient - baseline_estimator_loss
         J =_debug_func(J ,'policy_J',break_point=False, to_file=True)
