@@ -695,7 +695,7 @@ class AOD(IForward):
         bbox_loss = tf.reduce_mean(bbox_losses)
         policy_loss = tf.reduce_mean(policy_losses)
         total_invalid_bbox = tf.reduce_mean(tf.reduce_sum(total_invalid_bbox,[1,2,3]))
-        reward = tf.reduce_sum(self.rewards)
+        reward = tf.reduce_mean(tf.reduce_sum(self.rewards,[1]))
 
         batch_loss = class_loss*1.0 + bbox_loss*1.0 + policy_loss*1.0 + total_invalid_bbox*0.1
 
@@ -741,6 +741,7 @@ class AOD(IForward):
         tf.summary.scalar("losses/class_loss", class_loss)
         tf.summary.scalar("losses/bbox_loss", bbox_loss)
         tf.summary.scalar("losses/policy_loss", policy_loss)
+        tf.summary.scalar("losses/total_invalid_bbox", total_invalid_bbox)
         tf.summary.scalar("losses/batch_loss", batch_loss)
         tf.summary.scalar("losses/total_loss", total_loss)
         for var in tf.trainable_variables():
