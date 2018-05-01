@@ -159,11 +159,11 @@ class Global_Config(object):
         self.num_examples_per_epoch = 20000
 
         # Optimizer for training the model.
-        # self.optimizer = "SGD"
-        self.optimizer = "Adam"
+        self.optimizer = "SGD"
+        # self.optimizer = "Adam"
 
         # Learning rate for the initial phase of training.
-        self.initial_learning_rate = 1.0e-2
+        self.initial_learning_rate = 1.0e-1
         self.learning_rate_decay_factor = 1.0
         self.num_epochs_per_decay = 1000.0
 
