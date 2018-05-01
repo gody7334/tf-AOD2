@@ -572,9 +572,13 @@ class AOD(IForward):
         p_loc =_debug_func(p_loc ,'policy_p_loc',break_point=False, to_file=True)
 
         # likelihood estimator
-        J = tf.reduce_sum(tf.reduce_sum(tf.log(p_loc + 1e-10),[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
-        # J = tf.reduce_sum(tf.reduce_sum(p_loc + 1e-10,[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
-        J = J - tf.reduce_sum(tf.square(cum_rewards - baseline_iou), 1)
+        policy_gradient = tf.reduce_sum(tf.reduce_sum(tf.log(p_loc + 1e-10),[2]) * (cum_rewards - baseline_iou_stop_gradient),[1])
+        baseline_estimator_loss = tf.reduce_sum(tf.square(cum_rewards - baseline_iou), 1)
+
+        tf.summary.scalar("losses/policy_gradient", tf.reduce_mean(policy_gradient))
+        tf.summary.scalar("losses/baseline_estimator_loss", tf.reduce_mane(baseline_estimator_loss))
+
+        J = policy_gradient - baseline_estimator_loss
         J =_debug_func(J ,'policy_J',break_point=False, to_file=True)
         return -J
 
