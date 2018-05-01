@@ -78,8 +78,10 @@ class AOD(IForward):
 
         if self.mode == 'train':
             self.loc_sd = 0.1
+            self.random_target_rate = 1.0
         else:
             self.loc_sd = 1e-10
+            self.random_target_rate = 0.0
 
         self.ee_ratio = 0.9
         self.region_proposals_list = []
@@ -223,7 +225,12 @@ class AOD(IForward):
             random_target_loc = tf.squeeze(tf.slice(tf.transpose(tf.random_shuffle(tf.transpose(self.bbox_seqs,(1,0,2))),(1,0,2)), [0,0,0],[-1,1,-1]))
             random_target_loc = self._convert_coordinate(random_target_loc, "mscoco", "frcnn",dim=2)
             random_target_loc.set_shape([self.NN, self.B])
-            mask = tf.cast(tf.equal(random_target_loc,0),tf.float32)
+
+            # when evaluation, remove random select target into sampling process
+            random_mask = tf.random_uniform([self.NN, 1], 0, 1, tf.float32)
+            random_mask = tf.less(random_mask, self.random_target_rate)
+
+            mask = tf.cast(tf.equal(random_target_loc * random_mask, 0),tf.float32)
             # sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
             sample_loc_origin = (mean_loc+tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd))*(mask) + (random_target_loc+ tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd*self.loc_sd))*(1-mask)
 
@@ -538,7 +545,7 @@ class AOD(IForward):
         invalid_sample_loc =_debug_func(invalid_sample_loc ,'policy_invalid_sample_loc',break_point=False, to_file=True)
 
         # rewards
-        rewards_scale = 1e0
+        rewards_scale = 1e1
         invalid_scale = 1e0
         invalid_area_scale = 1e0
         # rewards = (tf.squeeze(iou,[1,2]))*rewards_scale
@@ -690,7 +697,7 @@ class AOD(IForward):
         total_invalid_bbox = tf.reduce_mean(tf.reduce_sum(total_invalid_bbox,[1,2,3]))
         reward = tf.reduce_sum(self.rewards)
 
-        batch_loss = class_loss*1.0 + bbox_loss*1.0 + policy_loss*1.0 + total_invalid_bbox*1.0
+        batch_loss = class_loss*1.0 + bbox_loss*1.0 + policy_loss*1.0 + total_invalid_bbox*0.1
 
         batch_loss = self._l2_regularization(batch_loss)
 
