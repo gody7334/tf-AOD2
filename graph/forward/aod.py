@@ -228,7 +228,7 @@ class AOD(IForward):
 
             # when evaluation, remove random select target into sampling process
             random_mask = tf.random_uniform([self.NN, 1], 0, 1, tf.float32)
-            random_mask = tf.less(random_mask, self.random_target_rate)
+            random_mask = tf.cast(tf.less(random_mask, self.random_target_rate), tf.float32)
 
             mask = tf.cast(tf.equal(random_target_loc * random_mask, 0),tf.float32)
             # sample_loc_origin = mean_loc + tf.random_normal(mean_loc.get_shape(), 0, self.loc_sd)
